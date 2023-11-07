@@ -1,0 +1,11 @@
+# =================================================
+#            remove_all_tmp_dir MANUAL
+# =================================================
+
+This is the last task of the "buoy_bufr_conversion"
+family of the "bufr_conversion" suite.
+The only aim of this tast is to remove the 
+temporary working directory used for the suite 
+process. The path of this directory is defined in
+the "buoy_bufr_conversion.ini" initialization file
+as tmp_dir_root.

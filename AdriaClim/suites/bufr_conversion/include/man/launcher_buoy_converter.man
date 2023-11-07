@@ -1,0 +1,20 @@
+# =============================================================================
+#                       launcher_buoy_converter MANUAL
+# =============================================================================
+
+This is the manual of the "launcher_buoy_converter" task. The main goal of
+this task is to manage the job (and the related Python scripts) used for the
+buoy data conversion. 
+
+The task runs along a time period of ($day_range - 2) days. This is necessary
+in case of delays on the buoys raw data download/transmission. If a particular
+date is not available, there are ($day_range - 2) days  left ahead to convert
+that particular day-data. 
+
+The .ecf script task extracts the raw data from the "input_dir" archiviation
+directories and modifies the "converter_buoy_template.job" template to launch
+the buoy data conversion process.
+
+Inside the task, different cycles run along the buoys identification names
+(e.g. "RFVGCORON4" "AFVGBARBAN" for "cortek" type and "5228" "5229" "522f" for
+"nke_wimo" type).

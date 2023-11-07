@@ -1,0 +1,17 @@
+#============================================================================
+#                             't_clean' MANUAL
+#============================================================================
+
+This is the manual fot 't_clean' task. This task included in 'SHYFEM_forecast'
+suite can be launched whenever you want and moreover can be included in a 
+different suite too. 
+
+This task's goal is to remove the plots/animation (and their directories) 
+older than a particular day period (e.g 30 days). 
+The file archiviation of SHYFEM_forecast suite increase the database of about
+9500 files. This huge storage occupy 1.1 GB of memory and for this reason 
+is necessary to clean the database starting from the older files.
+
+The minimum age for remotion of files and directories can be personalised 
+by the 't_clean.ini' initialization file. The remotion process is launched 
+with daily frequency at the end of the 'SHYFEM_forecast' suite.

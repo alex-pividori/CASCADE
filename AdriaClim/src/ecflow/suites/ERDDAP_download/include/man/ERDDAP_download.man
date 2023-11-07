@@ -1,0 +1,105 @@
+# ******************************************************************************
+#                                   MANUAL
+#                   To be used in the frame of "ecFlow" suites
+#            (https://confluence.ecmwf.int/display/ECFLOW/ecflow+home)
+# ******************************************************************************
+#
+#  DESCRIPTION:      this is the manual for the "ERDDAP_download" suite.
+#                    It contains the following type of information:
+#                     - GOAL OF THE SUITE;
+#                     - DESCRIPTION OF THE SUITE;
+#                     - GUIDE FOR USERS;
+#                     - WHAT TO DO IN CASE OF FAILURES;
+#
+#  DEVELOPER:        Alessandro Minigher (alessandro.minigher@arpa.fvg.it)
+#                    ARPA FVG - S.O.C. Osmer e GRN - S.O.S. Qualità dell'aria
+#
+#  CREATION DATE:    2022-11-11.
+#
+#  MODIFICATIONS:    none.
+#
+#  VERSION:          0.1.
+#
+# ******************************************************************************
+
+GOAL OF THE SUITE
+Download of data from the ERDDAP data server of the "Centro Euro-Mediterraneo
+sui Cambiamenti Climatici" (CMCC) and conversion of the data thelselves in the
+format suitable for the SHYFEM model.
+
+DESCRIPTION OF THE SUITE
+The suite is composed by a main family ("DATASET_1"), which is dedicated to a
+specific time period. This family can be easily duplicated as many times as you
+want (e.g. "DATASET_2", "DATASET_3", etc.), in order to simultaneously consider
+multiple different time periods.
+The main family is composed by the following subfamilies, the description of
+which explains the aim of the suite itself:
+
+ 1) "marine" -> this is the family for downloading ("download" family),
+                post-processing ("postproc" family), archiving ("archive"
+                family) and cleaning ("clean" family) marine products
+                (temperature, "T" family; salinity, "S" family; water level,
+                "Z" family; currents, "UV" family). The "UV" family is
+                subdivided into two subfamilies (zonal current, "U" family;
+                meridional current, "V" family).
+                Please note that it is assumed that the temperature is in °C,
+                the salinity is in g/kg, the water level is in m and the
+                currents are in m/s.
+ 2) "meteo"  -> this is the family for downloading ("download" family),
+                post-processing ("postproc" family), archiving ("archive"
+                family) and cleaning ("clean" family) meteorological products
+                (wind, "wind" family; heat, "heat" family; precipitation,
+                "rain" family). The "wind" family is subdivided into three
+                subfamilies (zonal wind velocity at 10 m, "U10" family;
+                meridional wind velocity at 10 m, "V10" family; sea level
+                pressure, "SLP" family). The "heat" family is subdivided into
+                four subfamilies (air temperature at 2 m, "T2M" family;
+                specific humidity at 2 m, "Q2M" family; shortwave downward
+                radiation, "SW" family; total cloud cover, "TCC" family).
+                Please note that it is assumed that the wind velocities are in
+                m/s, the sea level pressure is in Pa, the air temperature at 2
+                m is in K (hence it is converted from K to °C), the specific
+                humidity at 2 m is in kg/kg, the shortwave downward radiation
+                is in W/m^2, and the precipitation is in mm and has a time
+                resolution of 6 hours (hence it is converted from mm/6h to
+                mm/day);
+ 3) "river"  -> this is the family for downloading ("download" family),
+                post-processing ("postproc" family), archiving ("archive"
+                family) and cleaning ("clean" family) hydrological products
+                (streamflow [m^3/s], "SM" family).
+                Please note that it is assumed that the streamflow is in m^3/s.
+
+GUIDE FOR USERS
+In order to be able to properly use this suite, follow the steps listed below:
+
+ 1) check the ENVIRONMENTAL VARIABLES in the DEFINITION SECTION of the suite's
+    definition file ("%SUITE%.def") and edit them according to your environment
+    or convenience;
+ 2) check the "DATE_START" and "DATE_END" variables in the FAMILY SECTION of
+    the suite's definition file ("%SUITE%.def") and edit it according to the
+    starting and ending date ("YYYYMMDD") of the time period you want to
+    consider, respectively;
+ 3) prepare the initialisation file of the suite, which is unique, to be named
+    as "ERDDAP_download.ini": this file should be already present in the
+    "include/etc" subdirectory of the suite, hence just edit it according to
+    your environment and needs;
+ 4) load the suite (ecflow_client --load=%SUITE%.def);
+ 5) begin the suite (ecflow_client --begin=%SUITE%);
+ 6) in case you want to consider N (>1) time periods simultaneously, copy the
+    "DATASET_1" family (FAMILY SECTION of the suite's definition file,
+    "%SUITE%.def") below itself, N-1 times, renaming the new families properly
+    (e.g. "DATASET_2", "DATASET_3", ..., "DATASET_N") and following steps
+    1)-3). Afterwards, if the suite already began, replace all the new families
+    (e.g. ecflow_client --replace=/%SUITE%/SIM_2 %SUITE%.def); otherwise,
+    follow steps 4) and 5).
+
+WHAT TO DO IN CASE OF FAILURES
+In case of failures, follow the hints listed below:
+
+ 1) check which node generated the failure and try to remove the bug. All tasks
+    of this suite should complete without failures.
+    In many cases, you can re-queue the whole suite and the problem is solved;
+ 2) keep in mind to check the "ecFlow" log files and to save them before
+    re-requeuing the suite, otherwise they will be overwritten.
+    You can find log files in the suite's "ECF_HOME" subdirectory
+    ("%ECF_HOME%/%SUITE%").

@@ -1,0 +1,75 @@
+# ******************************************************************************
+#                                    TASK
+#                   To be used in the frame of "ecFlow" suites
+#            (https://confluence.ecmwf.int/display/ECFLOW/ecflow+home)
+# ******************************************************************************
+#
+#  DESCRIPTION:    The aim of this task is the check availability of
+#                  of some SHYFEM generated files (simulation output and other info files)
+#                  essential for the goal of the entire suite. 
+#                  If all files are available, an event triggers run the following tasks
+#                  of the flow. 
+#
+#  EXTERNAL CALLS: - None
+#
+#  EXTERNAL FILES: - header managing general calls to "ecFlow" client;
+#                  - Task manual 'data_spy.man';
+#                  - suite general initialisation file 'general.ini';
+#                  - tail managing general calls to "ecFlow" client.
+#
+#  DEVELOPER:      Pividori Alex ( alex.pividori@arpa.fvg.it)
+#                  ARPA FVG - CRMA
+#
+#  CREATION DATE:  2023-05-02
+#
+#  MODIFICATIONS:  none.
+#
+#  VERSION:        0.1.
+#
+# ******************************************************************************
+
+%manual
+%include <man/data_spy.man>
+%end
+
+%include <head_4_bash.h>                                # Include header common to all tasks.
+                                                        # It manages general calls to ecflow client
+
+%include <etc/general.ini>
+                                                      
+# Current date from ecflow variable
+DATE="%ECF_DATE%"
+
+# Bulletin date
+DATEB=$( date -u -d "$DATE $bulletin_date_delta" +%%Y%%m%%d )
+
+YYYYB="${DATEB:0:4}"
+MMB="${DATEB:4:2}"
+DDB="${DATEB:6:2}"
+
+#**** Directories ******
+
+input_dir="${input_dir_tpl//%%year%%/${YYYYB}}"
+input_dir="${input_dir//%%month%%/${MMB}}"
+input_dir="${input_dir//%%day%%/${DDB}}"
+
+data_dir="${data_dir_tpl//%%year%%/${YYYYB}}"
+data_dir="${data_dir//%%month%%/${MMB}}"
+data_dir="${data_dir//%%day%%/${DDB}}"
+
+# ====== Check SHYFEM forecast files ======
+
+if    [[ ! -d "${input_dir}" && -d "${data_dir}" && ! -z "$( find ${input_dir} -name ${info_file} )" && -s "${data_dir}/${nodes_info_file}" && ! -z "$( ls -A ${data_dir} )" ]]; then
+    echo "The directories \"$input_dir\" and \"$data_dir\" exists. Also \"$info_file\" and \"$nodes_info_file\" exists. The forecast plot creation can go on."
+    ecflow_client --event=data_available
+else
+    echo -e "\t The directory ${input_dir} and/or ${data_dir} doesn't exist yet. Or ${nodes_info_file} and/or ${info_file} doesn't exists or are empty. We will try in 15 minutes.\n"
+#    ecflow_client --complete=/SHYFEM_forecast
+
+#    ecflow_client --requeue=force  %ECF_NAME%
+fi
+
+
+%include <tail_4_bash.h>               # Include tail common to all tasks.
+                                       # It manages general calls to ecflow client
+

@@ -1,0 +1,303 @@
+# Include the manual of this task
+%manual
+%include <man/warnings_errors_check.man>
+%end
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+
+# Include a family-specific initialisation file
+%include <etc/%SUITE%.ini>
+
+if   [[ "${we_modality}" == "off" ]]; then 
+
+    echo -e "\tThe 'we_modality' varibale in 'bufr_conversion.ini' initialization file is set to \"off\". The warning/error check won't be performed." 
+    ecflow_client --complete 
+
+elif [[ "${we_modality}" == "on"  ]]; then 
+
+    echo -e "\tThe 'we_modality' varibale in 'bufr_conversion.ini' initialization file is set to \"on\". The warning/error check will be performed."
+
+    # ========================================================================
+    #                        Buoy data warning/error check
+    # ========================================================================
+    
+    cd "${tmp_dir_root}" && echo -e "\n\tNow I'm in the \"${tmp_dir_root}\" directory.\n" || { echo -e "\n\tI can't move to directory '\$tmp_dir_root': \"${tmp_dir_root}\"\n"; ERROR; }
+    
+    # The control process continues backwards for
+    # $day_range_check days. It is common to set 'day_range_check'=1 to avaid
+    # multiple warning/error mails for the same warning/error already sent.
+    
+    echo -e  "\n\tThe Warning and Error check will cover a $day_range_check days period:"
+    echo -ne "\t - from $(date -d "-$(( start_day_check + day_range_check - 1 ))day" +"%%Y-%%m-%%d") to $(date -d "-${start_day_check}day" +"%%Y-%%m-%%d") "
+    echo -e  "for nke_wimo buoys (extremes included).\n"
+    
+    for day_shift in $( seq $start_day_check $(( day_range_check + start_day_check - 1 )) ) 
+    do
+    
+        # Useful set of dates needed for the conversion process
+        # =================== Reference date =====================
+        year=`        date -d "-${day_shift}day"           +"%%Y"`
+        month=`       date -d "-${day_shift}day"           +"%%m"`
+        day=`         date -d "-${day_shift}day"           +"%%d"`
+        #  === Year (YYYY) and month (MM) previous (-1 Month) ====
+        #      respect to the "${year}${month}" date
+        year_prv=`    date -d "$year-$month-$day  -1month" +"%%Y"`
+        month_prv=`   date -d "$year-$month-$day  -1month" +"%%m"`
+        # ==================== Date +1 day =======================
+        year_1p=`     date -d "$year-$month-$day  +1day"   +"%%Y"`
+        month_1p=`    date -d "$year-$month-$day  +1day"   +"%%m"`
+        day_1p=`      date -d "$year-$month-$day  +1day"   +"%%d"`
+        # =========== cortek Analysis date ( yesterday ) =========
+        year_1m=`     date -d "$year-$month-$day  -1day"   +"%%Y"`
+        month_1m=`    date -d "$year-$month-$day  -1day"   +"%%m"`
+        day_1m=`      date -d "$year-$month-$day  -1day"   +"%%d"`
+        # == nke-wimo Analysis date ( the day before yesterday ) =
+        year_2m=`     date -d "$year-$month-$day  -2day"   +"%%Y"`
+        month_2m=`    date -d "$year-$month-$day  -2day"   +"%%m"`
+        day_2m=`      date -d "$year-$month-$day  -2day"   +"%%d"`
+        # ========== functional date for nke_wimo buoys ==========
+        year_3m=`     date -d "$year-$month-$day  -3day"   +"%%Y"`
+        month_3m=`    date -d "$year-$month-$day  -3day"   +"%%m"`
+        day_3m=`      date -d "$year-$month-$day  -3day"   +"%%d"`
+        # ================== Input directories ===================
+        nke_wimo_input_dir="${nke_wimo_input_dir_tpl//%%year%%/${year}}"
+        nke_wimo_input_dir="${nke_wimo_input_dir//%%month%%/${month}}"
+        nke_wimo_input_dir="${nke_wimo_input_dir//%%day%%/??}"
+
+        # ========= Input directories (previous month) ===========
+        nke_wimo_input_dir_prv="${nke_wimo_input_dir_tpl//%%year%%/${year_prv}}"
+        nke_wimo_input_dir_prv="${nke_wimo_input_dir_prv//%%month%%/${month_prv}}"
+        nke_wimo_input_dir_prv="${nke_wimo_input_dir_prv//%%day%%/??}"
+    
+        # =========================================================================
+    
+        # The buoy_types array contains "cortek" and/or "nke_wimo", e.g.
+        # buoy_types=( "cortek" "nke_wimo" )
+        for b_type in ${buoy_types_we[@]}
+        do
+    
+            case $b_type in
+    
+            # ============================
+            #          nke_wimo
+            # ============================
+    
+            "nke_wimo")
+    
+            # ******************************************
+    
+            for buoy in ${we_buoy_names_nke_wimo[@]}     # prefix buoy types
+            do
+                
+                # We replace the day digits with wildcards (current month)
+                dir2find="${nke_wimo_input_dir::-2}[0-3][0-9]"
+                # We replace the day digits with wildcards (previous month)
+                dir2find_prv="${nke_wimo_input_dir_prv::-2}[0-3][0-9]"
+                # ===
+                
+                # ==== File with date reference ====
+                file2find="${nke_wimo_input_file_tpl//%%buoy%%/${buoy}}"
+                file2find="${file2find//%%year%%/${year:2:2}}"
+                file2find="${file2find//%%month%%/${month}}"
+                file2find="${file2find//%%day%%/${day}}"
+
+                # ====== File the day before =======    
+                file2find_1m="${nke_wimo_input_file_tpl//%%buoy%%/${buoy}}"
+                file2find_1m="${file2find_1m//%%year%%/${year_1m:2:2}}"
+                file2find_1m="${file2find_1m//%%month%%/${month_1m}}"
+                file2find_1m="${file2find_1m//%%day%%/${day_1m}}"
+    
+                echo "file2find: $file2find, file2find_1m: $file2find_1m"
+
+                files_str=`find ${dir2find}  ${dir2find_prv}  -type f             \
+                       \( -name "${file2find}"  -o  -name "${file2find_1m}" \)    \
+                          -printf "%%f:%%p\n"  | sort | awk -F: '!seen[$1]++ {print $2}' `
+    
+    
+    #            # ===
+    #            gps_file="${nke_wimo_gps_input_file_tpl//%%buoy%%/${buoy}}"
+    #            gps_file="${gps_file//%%year%%/${year}}"
+    #            gps_file="${gps_file//%%month%%/${month}}"
+    #            gps_file="${gps_file//%%day%%/${day}}"
+    #
+    #            path_gpx=`find  ${dir2find}                            \
+    #                            ${dir2find_prv}  -type f -size +0c     \
+    #                     -name "${gps_file}" | head -n 1 `
+    #
+    #            # ====== GPS file check ======
+    #            # == Currently not available for applicant's reason ==
+    #
+    #            if [[ -z  "$path_gpx" ]]; then
+    #                echo -e "\n\tWARNING: \"${gps_file}\" file not found. Lat/Lon coordinates are not available."
+    #
+    #                # ====== WARNING mail ======
+    #                mailx -s "WARNING: nke_wimo buoy gpx file not available." ${mail_warnings} <<< \
+    #                "There is no gps file available for ${buoy} buoy in date: ${year}-${month}-${day}."
+    #                unset path_gpx
+    #            fi
+    
+                echo  -e "files_str:\n $files_str"
+                echo
+    
+                # $list_files contains also the file path, not only the file name
+                list_files=( $files_str )
+    
+                # Unique file containing raw buoy data (please do not change the name of this file)
+                nke_data_row="$( mktemp -u nke_data_row_XXXX.txt )"
+    
+                if [[ ${#list_files[@]} -gt 0 ]]; then
+                    cat "${list_files[@]}" | grep "${year}-${month}-${day} [0-9][0-9]" | sort > "$nke_data_row"    
+                fi
+    
+                # =====================================
+                # ========== Data files check =========
+                #======================================
+    
+                # ====== Data File doesn't found ======
+                if [[ ${#list_files[@]} -eq 0 ]]; then 
+                    echo -e "\tThere is no data files for \"${buoy}\" ${b_type} buoy in ${year}-${month}-${day}.\n"
+    
+                    # ====== WARNING mail ======
+                    mailx -s "WARNING: nke_wimo buoy data file not available." ${mail_warnings} <<< \
+                             "There are no data files available for ${buoy} buoy in date: ${year}-${month}-${day}."
+                    continue
+    
+                # ======= Data file found but empty =======
+                elif [[ ${#list_files[@]} -eq 1 && ! -s "${list_files[@]}" ]]; then
+                    
+                    echo -e "\tThere exists a data file for \"${buoy}\" ${b_type} buoy in ${year}-${month}-${day} but it is empty.\n"
+    
+                    # ====== ERROR mail ======
+                    mailx -s "ERROR: nke_wimo buoy data file completely empty." ${mail_warnings} <<< \
+                             "The data file for ${buoy} buoy in date: ${year}-${month}-${day} is available but empty."
+                    continue
+                fi        
+    
+                # ==================================================================================
+                # ============================= Physical Quantities check ==========================
+                # ==================================================================================
+        
+                if [[ $( wc -l "${nke_data_row}" | tr -d [:alpha:] | tr -d "_. " ) -gt 0 ]]; then     # more than 0 data lines
+    
+                    # ======= Oxygen check values ( 5th column ) =======
+                    ox_lines=( $( egrep  -n \
+                           "^([0-9]|\-| |:)+,([0-9]|\.|\-)+,([0-9]|\.)+,([0-9]|\.)+,[0-$(( ${ox_min:0:1} - 1 ))]{,1}[0-9]\.[0-9]+,([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+" \
+                          ${nke_data_row} | awk -F':' '{ print $1 }' ) )        
+    
+                    count=1; c_max=1
+                    for i in $( seq 0 $(( ${#ox_lines[@]} - 2 )) ); do
+                        if [[ ${ox_lines[$(( i + 1 ))]} -eq $(( ${ox_lines[${i}]} + 1 )) ]]; then (( count+=1 )); if [[ $count -gt $c_max ]]; then c_max=$count; fi; else count=1; fi
+                    done
+    
+                    if [[ ${c_max} -ge ${we_lines} ]]; then
+                        echo "There are ${we_lines} or more consecutive oxygen saturation values smaller than ${ox_min}%%."
+    
+                        mailx -s "WARNING: Oxygen saturation values less than ${ox_min}%%" ${mail_warnings} <<< \
+                        "The ${buoy} nke_wimo buoy in date: ${year}-${month}-${day} measured ${we_lines} or more consecutive Oxygen-Saturation values less than ${ox_min}%%."
+                    fi
+    
+                    # ======= Temperature check values ( 7th column ) =======                
+    
+                    temp_lines=( $( egrep -n "^([0-9]|\-| |:)+,([0-9]|\.|\-)+,([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+,[0-$(( temp_min - 1 ))]\.[0-9]+,([0-9]|\.)+,([0-9]|\.)+" \
+                          ${nke_data_row} | awk -F':' '{ print $1 }' ) )
+                 
+                    count=1; c_max=1
+                    for i in $( seq 0 $(( ${#temp_lines[@]} - 2 )) ); do
+                        if [[ ${temp_lines[$(( i + 1 ))]} -eq $(( ${temp_lines[${i}]} + 1 )) ]]; then (( count+=1 )); if [[ $count -gt $c_max ]]; then c_max=$count; fi; else count=1; fi
+                    done
+    
+                    if [[ ${c_max} -ge ${we_lines} ]]; then
+                        echo "There are ${we_lines} or more consecutive Temperature values smaller than ${temp_min}°C."
+    
+                        mailx -s "WARNING: Temperature values less than ${temp_min} degrees centigrade." ${mail_warnings} <<< \
+                        "The ${buoy} nke_wimo buoy in date: ${year}-${month}-${day} measured ${we_lines} or more consecutive Temperature values less than ${temp_min} C."
+                    fi
+    
+                    # ======= Salinity check values ( 8th column ) =======
+    
+                    sal_lines=( $( egrep -n "^([0-9]|\-| |:)+,([0-9]|\.|\-)+,([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+,[0-$(( sal_min - 1 ))]\.[0-9]+,([0-9]|\.)+" \
+                          ${nke_data_row} | awk -F':' '{ print $1 }' ) )
+    
+                    count=1; c_max=1
+                    for i in $( seq 0 $(( ${#sal_lines[@]} - 2 )) ); do
+                        if [[ ${sal_lines[$(( i + 1 ))]} -eq $(( ${sal_lines[${i}]} + 1 )) ]]; then (( count+=1 )); if [[ $count -gt $c_max ]]; then c_max=$count; fi; else count=1; fi
+                    done
+    
+                    if [[ ${c_max} -ge ${we_lines} ]]; then
+                        echo "There are ${we_lines} or more consecutive Salinity values smaller than ${sal_min} PSU."
+    
+                        mailx -s "WARNING: Salinity values less than ${sal_min} PSU." ${mail_warnings} <<< \
+                        "The ${buoy} nke_wimo buoy in date: ${year}-${month}-${day} measured ${we_lines} or more consecutive Salinity values less than ${sal_min} PSU."
+                    fi                
+    
+                    # ======= Pressure check values ( 2nd column ) =======
+    
+                    # WARNING if pressure is smaller or equal to 0
+                    press_lines=( $( egrep -n  "^([0-9]|\-| |:)+,(\-([0-9]|\.)+|0\.*0*),([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+,([0-9]|\.)+,[0-9]\.[0-9]+,([0-9]|\.)+" \
+                          ${nke_data_row} | awk -F':' '{ print $1 }' ) )
+    
+                    count=1; c_max=1
+                    for i in $( seq 0 $(( ${#press_lines[@]} - 2 )) ); do
+                        if [[ ${press_lines[$(( i + 1 ))]} -eq $(( ${press_lines[${i}]} + 1 )) ]];then (( count+=1 ));if [[ $count -gt $c_max ]];then c_max=$count;fi;else count=1;fi
+                    done
+    
+                    if [[ ${c_max} -ge ${we_lines} ]]; then
+                        echo "There are three or more consecutive Pressure values smaller or equal than 0 dbar."
+    
+                        mailx -s "WARNING: Pressure values less (or equal) than 0 dbar." ${mail_warnings} <<< \
+                        "The ${buoy} nke_wimo buoy in date: ${year}-${month}-${day} measured ${we_lines} or more consecutive Pressure values less (or equal) than 0 dbar."
+                    fi           
+    
+                    # ====== 0 values check (All columns from the first) ======
+                    
+                    zero_lines=( $( egrep  -n  ",0\.*0*(,|$)"  ${nke_data_row} | awk -F':' '{ print $1 }' ) )
+    
+                    count=1; c_max=1
+                    for i in $( seq 0 $(( ${#zero_lines[@]} - 2 )) ); do
+                        if [[ ${zero_lines[$(( i + 1 ))]} -eq $(( ${zero_lines[${i}]} + 1 )) ]]; then (( count+=1 )); if [[ $count -gt $c_max ]]; then c_max=$count; fi; else count=1; fi
+                    done
+    
+                    if [[ ${c_max} -ge ${we_lines} ]]; then
+                        echo "There are ${we_lines} or more consecutive zero values for one or more physical quantities."
+    
+                        mailx -s "WARNING: Consecutive zero values for one or more physical quantities." ${mail_warnings} <<< \
+                       "The ${buoy} nke_wimo buoy in date: ${year}-${month}-${day} measured ${we_lines} or more consecutive zero values for one or more physical quantities."
+                    fi
+    
+                    unset  ox_lines  temp_lines  sal_lines  press_lines  zero_lines
+                else
+                    echo -e "\tThere is no data for \"${buoy}\" ${b_type} buoy in ${year}-${month}-${day} date. Warnings/ERRORS check can't be performed.\n"
+                fi
+    
+                rm  "${nke_data_row}" || echo "I can't remove ${nke_data_row} file data."
+                unset list_files
+    
+            done
+            ;;
+    
+            # ============================
+            #             else
+            # ============================
+    
+            *)
+                echo -e "\n\tWARNING: \"${b_type}\" buoy type not supported for values check. Please insert \"nke_wimo\".\n"
+            ;;
+    
+            esac
+    
+        done # end of buoy types cycle
+    
+        echo -e "\n\tCheck analysis in date file:${year}/${year}${month}${day}, nke_wimo buois completed.\n"
+    
+    done # end of back-days cycle 
+
+else
+    
+    echo -e "WARNING: The 'we_modality': $we_modality value is not supported. It has to be 'on' or 'off'."
+
+fi   # end of on/off 'we_modality' check
+
+echo -e "The 'warnings_errors_check.ecf' task is finished."
+
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

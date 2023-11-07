@@ -1,0 +1,38 @@
+%manual
+%include <man/set_dir.man>
+%end
+
+%include <head_4_bash.h>                                # Include header common to all tasks.
+                                                        # It manages general calls to ecflow client
+
+%include <qsub_4_bash.h>
+%include <etc/general.ini>
+
+#===========================================================================================
+
+GOON=0
+
+cd $working_dir || GOON=1
+stat_index="$stat_index"
+
+if [[ $var != "temperature" ]] && [[ $var != "salinity" ]] && [[ $var != "water_level" ]]; then \
+         echo "The variable field is not correct. It has to be \"temperature\", \"salinity\" or \"water_level\"." ; fi
+
+initialization_file="${init_file_dir}/initialization_file_graph.txt"    # This is the big difference between the preview task
+
+if [ $GOON -eq 0 ]; then echo "I'm in the \"$working_dir\" working directory"; else echo "I can't move to \"$working_dir\""; fi
+
+sed  -e s/%%%%cdo_module%%%%/${cdo_module//\//\\/}/g                      \
+     -e s/%%%%python_module%%%%/${python_module//\//\\/}/g                \
+     -e s/%%%%miniconda_module%%%%/${miniconda_module//\//\\/}/g          \
+     -e s/%%%%tmp_dir_root%%%%/${working_dir//\//\\/}/g                   \
+     -e s/%%%%simulation_arc_dir%%%%/${simulation_arc_dir//\//\\/}/g      \
+     -e s/%%%%init_file%%%%/${initialization_file//\//\\/}/g              \
+     -e s/%%%%var%%%%/${var}/g                                            \
+     -e s/%%%%stat_index%%%%/${stat_index}/g                              \
+     -e 's/%%%%SIMULATION_CODE%%%%/%SHYFEM_SIMULATION_CODE%/g'     benchmark_comparison_graph_template.job    >    benchmark_comparison_graph.job
+
+qsub  benchmark_comparison_graph.job
+
+%include <tail_4_bash.h>               # Include tail common to all tasks.
+                                       # It manages general calls to ecflow client

@@ -1,0 +1,73 @@
+#==================================================================================================
+#                          This is the MANUAL for the buoy_bufr_conversion suite
+#==================================================================================================
+
+This is the manual of the "buoy_bufr_conversion" family contained in bufr_conversion suite.
+This family has been designed to manage two kinds of buoy data: 'nke_wimo' and 'cortek'. These
+buoys data present a particul file format that Python script can read, interpret and convert in
+BUFR binary format. If you want to know more about BUFR format architecture, you can find a lot
+of information on-line. Some useful web-sites are the following:
+
+https://etrp.wmo.int/pluginfile.php/30810/mod_resource/content/1/Bufr_decoding.pdf
+https://confluence.ecmwf.int/download/attachments/35752427/bufr_user_guide.pdf
+
+and so many other sources.
+BUFR format files are managed by eccodes software distributed by ECMWF 
+(https://www.ecmwf.int/en/learning/training/eccodes-grib-and-bufr-data-decoding-and-encoding-software).
+Another important tool for BUFR encoding end decoding is eccodes Python module. You can find a
+brief description of the functions contained in eccodes python module following the link below:
+http://download.ecmwf.int/test-data/eccodes/html/namespaceec_codes.html
+
+The result of conversion is store inside dedicated output directories. The conversion process is
+launched with daily frequence and a backwards conversion until n days is performed to prevent 
+possible data transmission dalays. For more informations about the suite design, please
+consult the task manuals.
+
+
+The goal of this family is to encode in-situ measured raw data from csv or mis data into BUFR binary format.
+BUFR is a binary format (https://rda.ucar.edu/datasets/ds476.0/docs/bufr_usr_guide.pdf    
+https://en.wikipedia.org/wiki/BUFR). The process is carried out
+by 'eccodes' module (eccodes/2.13.0/intel/19.1.1.217-ip7puyk) and 'eccodes' python-module. These software are 
+downloadable for free from the ECMWF official site (https://confluence.ecmwf.int).
+
+
+The partial documentation of theese tools is available from: 
+- eccodes tool-set: https://confluence.ecmwf.int/display/ECC/Documentation
+- eccodes Python module: http://download.ecmwf.int/test-data/eccodes/html/namespaceec_codes.html
+
+There are two kinds or raw data measures by buoys. 
+
+cortek buoys:    These are two stable buoys positioned inside the Marano-Grado lagoon. The labels are:
+                 - RFVGCORON4 ( 45.70965 °N 13.11657 °E )
+                 - AFVGBARBAN ( 45.70011 °N 13.41402 °E )
+
+                 The raw data transmitted by the buoys are memorized in .mis format. The sampling period
+                 is 10 minutes and the physical quantities stored are:
+                 - Code 0001 Voltage supply [V]
+   	         - Code 0002 Inner Gauge Temperature [°C]
+	         - Code 1000 Water Temperature [°C]
+	         - Code 1001 Specific conductivity at 25°C [mS/cm]
+	         - Code 1002 Salinity [PSU]
+	         - Code 1003 Water Turbidity [NTU]
+	         - Code 1004 Depth [m]
+                 - Code 2001 Sea level heigth respect to a specific reference value [m]
+
+nke-wimo buoys:  These are three anchored buoys positioned inside the Marano-Grado lagoon. The labels are:
+                 5228, 5229, 522f      
+
+                 The lat/lon coordinate GPS position is archived in <xml> format with the extension '.gpx'.
+                 
+                 The sampling period is 15 minutes long and the physical quantities measured and transmitted are:
+
+                 - Pressure [dbar]
+	         - pH [pH]
+	         - Oxygen Concentration [mg/L]
+	         - Oxygen Saturation [%]
+		 - Conductivity [mS/cm]
+		 - Temperature [°C]
+		 - Practical Salinity [PSU]
+		 - Depth [m]
+        
+                 Some units of measurement have been changed during the encoding process due to the unit
+                 restriction introduced by BUFR table. 
+

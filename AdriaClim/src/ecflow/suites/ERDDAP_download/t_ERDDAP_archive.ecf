@@ -1,0 +1,98 @@
+# ******************************************************************************
+#                                    TASK
+#                   To be used in the frame of "ecFlow" suites
+#            (https://confluence.ecmwf.int/display/ECFLOW/ecflow+home)
+# ******************************************************************************
+#
+#  DESCRIPTION:    this "ecFlow" task is aimed at moving files in the related
+#                  archive directories, which are created from scratch, if not
+#                  already existent.
+#
+#  EXTERNAL CALLS: none.
+#
+#  EXTERNAL FILES: - header managing general calls to "ecFlow" client;
+#                  - suite's initialisation file;
+#                  - tail managing general calls to "ecFlow" client.
+#
+#  DEVELOPER:      Alessandro Minigher (alessandro.minigher@arpa.fvg.it)
+#                  ARPA FVG - S.O.C. Osmer e GRN - S.O.S. Qualità dell'aria
+#
+#  CREATION DATE:  2022-11-14.
+#
+#  MODIFICATIONS:  none.
+#
+#  VERSION:        0.1.
+#
+# ******************************************************************************
+
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+# Suite's initialisation file
+%include <etc/ERDDAP_download.ini>
+
+#  --- START OF FUNCTIONS ---
+
+# Archive the given file (full path; first input argument) in the given
+# directory (second input argument)
+f_archive () {
+
+    # Create the archive directory, if not existent
+    if [[ ! -d "$2" ]]; then mkdir -p "$2"; fi
+
+    # Check the existence of the file to be archived:
+    #  - if it exists
+    if [[ -f "$1" ]]; then
+        # Archive it and inform the user
+        mv "$1" "$2"
+        echo -e "\n\tFile: ${1} moved in ${2}.\n"
+    #  - if it does not exist
+    else
+        # Inform the user
+        echo -e "\n\tFile: ${1} does not exist. It cannot be archived. Please check.\n"
+    fi
+
+}
+
+#  --- END OF FUNCTIONS ---
+
+#  --- START OF MAIN ---
+
+# Inform the user about the current directory
+echo -e "\tCurrent directory: $(pwd).\n"
+
+# Create the desired temporary (working) directory, if not existent, move into
+# it and inform the user
+if [[ ! -d "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}" ]]; then mkdir -p "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}"; fi
+echo -e "\tChange directory: moving to ${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}..."; cd "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}"
+echo -e "\tCurrent directory: $(pwd).\n"
+
+# If hydrological data have to be archived
+if [[ "%VAR%" == "streamflow_m" ]]; then
+
+    # Define the basename of the file to archive (template)
+    F_ARC="${SHY_OUT_FILE['%VAR%']}"
+
+    # For each river/basin
+    for RIVER_ID in ${RIVER_IDS[@]}; do
+        # Get the name of the river/basin
+        RIVER="${RIVERS[$RIVER_ID]}"
+        # Define the basename of the file to archive
+        SHY_OUT_FILE="${F_ARC//%%RIVER%%/$RIVER}"
+        # Function calling: archive the given file (full path; first input
+        # argument) in the given directory (second input argument)
+        f_archive "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}/$SHY_OUT_FILE" "${DATA_SHY_INPUT_ERDDAP_DT_DIR['%VAR%']}"
+    done
+
+# If data different from the hydrological ones have to be archived
+else
+
+    # Function calling: archive the given file (full path; first input
+    # argument) in the given directory (second input argument)
+    f_archive "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}/${SHY_OUT_FILE['%VAR%']}" "${DATA_SHY_INPUT_ERDDAP_DT_DIR['%VAR%']}"
+
+fi
+
+#  --- END OF MAIN ---
+
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

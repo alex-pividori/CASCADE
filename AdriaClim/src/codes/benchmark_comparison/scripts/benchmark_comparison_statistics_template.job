@@ -1,0 +1,118 @@
+#!/bin/bash
+
+#******************************************************************************
+#
+# DESCRIPTION:      This bash script is used to create CSV outputfiles containing
+#                   a series of statistical indicators based on a SHYFEM simulation
+#                   
+#
+# EXTERNAL CALLS:   none.
+#
+# EXTERNAL FILES:  - input NetCDF data file
+#                   
+#              
+#
+# DEVELOPER:         Alex Pividori (alex.pividori@arpa.fvg.it)
+#                    ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#                   "AdriaClim" Interreg IT-HR project
+#
+# SOFTWARE VERSION: Bash
+#                   CDO version 1.9.8
+#
+# CREATION DATE:    10/06/2022
+#
+# MODIFICATIONS:    10/06/2022 --> Transformation into a job
+#
+# VERSION:          0.1.
+#
+#******************************************************************************
+
+#========================= Temperature Version =======================
+
+#PBS -N stat_bm
+#PBS -o stdout_bm
+#PBS -e stderr_bm
+#PBS -P AdriaClim
+#PBS -W umask=0002
+#PBS -q arpa
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=00:30:00
+##PBS -m abe
+##PBS -M alex.pividori@arpa.fvg.it
+#PBS -W block=true
+
+var="%%var%%"
+depth_shy_array=( 1.2 2 3 4 5 6 7 8 9 10 12 14 16 18 20 22 24 26 28 30 32 35 )
+working_dir="%%tmp_dir_root%%"
+simulation_arc_dir="%%simulation_arc_dir%%"
+
+cd $working_dir  && echo "Now I'm inside $working_dir working directory"
+
+# module loading
+module load %%miniconda_module%%     &>/dev/null
+module load %%cdo_module%%           &>/dev/null
+
+#***********************************
+
+netCDF_dir="$simulation_arc_dir/%%SIMULATION_CODE%%/NetCDF"
+output_dir="$working_dir/output"
+
+if [ ! -d $output_dir ]; then mkdir $output_dir; fi
+if [[ "$var" == "water_level" ]]; then suffix="hydro"; else suffix="ts"; fi
+
+tmp_file="data_tmp.txt"
+
+while IFS=';' read node_name  depth_level
+do
+
+for month in $( seq 0 12 )
+do
+	netCDF_file="$( find $netCDF_dir -name  %%SIMULATION_CODE%%-EXTnode*-${node_name}-SHYnode*-NetCDFnode*.${suffix}.nc -type f )"
+
+if [[ "%%SIMULATION_CODE%%" != "1997F100D0_C001" ]]; then
+
+	label_file_name="$( find $netCDF_dir/.. -name  AdriaClim-*.csv -type f -printf "%f\n" )"
+	IFS="_" read -a label_arr <<< $label_file_name
+
+	label_model="$( find $netCDF_dir/../input/adri  -name  temp_*_rcp*_mon_*.fem -type f -printf "%f\n" )"
+	IFS="_" read -a label_model_arr <<< $label_model
+
+	RCP=${label_arr[2]:3:2}
+	year_in=${label_arr[4]:0:4}
+	year_fin=${label_arr[5]:0:4}
+	global_model=${label_model_arr[4]}
+	regional_model=${label_model_arr[7]}
+else                                                       # 1997F100D0_C001 simulation is the BENCHMARK and so doen't ha RCP or globar_models or regional_models
+	RCP="BENCHMARK"
+        year_in=2018
+        year_fin=2018
+        global_model="BENCHMARK"
+        regional_model="BENCHMARK"
+fi
+
+	IFS=";" read -a latlon_arr <<< "$( grep "$node_name" /lustre/arpa/AdriaClim/etc/EXT_nodes/list_of_EXT_nodes.csv )"
+	lat_n=${latlon_arr[1]}
+	lon_n=${latlon_arr[0]}
+
+if [[ ! $var == "water_level" ]]; then
+        if [ $month -eq 0 ]; then     # month equal to 0 means annual analysis
+                cdo outputf,%2.4g,1                    -selname,$var  -sellevel,${depth_shy_array[$(( depth_level - 1 ))]}  $netCDF_file > "$tmp_file"
+        else
+                cdo outputf,%2.4g,1  -selmonth,$month  -selname,$var  -sellevel,${depth_shy_array[$(( depth_level - 1 ))]}  $netCDF_file > "$tmp_file"
+        fi
+else
+        if [ $month -eq 0 ]; then     # month equal to 0 means annual analysis
+                cdo outputf,%2.4g,1                    -selname,$var    $netCDF_file > "$tmp_file"
+        else
+                cdo outputf,%2.4g,1  -selmonth,$month  -selname,$var    $netCDF_file > "$tmp_file"
+        fi
+fi
+        echo "I'm launching python script with arg: $month  "%%SIMULATION_CODE%%" ${node_name} $RCP $year_in $year_fin ${lat_n:0:5} ${lon_n:0:5} $global_model $regional_model $var"
+	python  statistic_analysis.py $month  "%%SIMULATION_CODE%%" ${node_name} $RCP $year_in $year_fin ${lat_n:0:5} ${lon_n:0:5} $global_model $regional_model $var \
+                 && { echo "Python script is finished" ; rm $tmp_file ; }
+
+done
+
+done  < %%init_file%%
+
+echo -e "\n"

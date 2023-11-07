@@ -1,0 +1,474 @@
+#!/bin/bash
+
+# ******************************************************************************
+#
+#  DESCRIPTION:      This bash job script is used to run different scripts used
+#                    to create shyfem forecasts plots. It manages the data extraction,
+#                    the initialization files and the plot scripts.
+#
+#  EXTERNAL CALLS:   - Python and NCL scripts created for different graphs output.
+#
+#  EXTERNAL FILES:   - Python Scripts for plot
+#                    - NCL Scripts for plot
+#                    - Encoding file name script (bash language)
+#                    - Initialization files
+#                    - L, V, E Tables for plot name encoding
+#                    - SHYFEM csv output files
+#
+#  DEVELOPER:        Alex Pividori (alex.pividori@arpa.fvg.it)
+#                    ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#
+#  CREATION DATE:    22/04/2023
+#
+#  MODIFICATIONS:    22/04/2023 --> Transformation into a job;
+#
+#  VERSION:          0.1.
+#
+# ******************************************************************************
+
+#PBS -N SHYFEM_forecast_plot
+#PBS -o stdout_plot
+#PBS -e stderr_plot
+#PBS -W umask=0002
+#PBS -q %%queue%%
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=%%wall_time%%
+#PBS -W block=true
+
+# ========= Variables ==========
+YYYYF="%%YYYYF%%"
+MMF="%%MMF%%"
+DDF="%%DDF%%"
+DATEF="${YYYYF}${MMF}${DDF}"
+DATEB="%%DATEB%%"
+
+day_f="%%day_f%%"
+
+code_field_length="%%code_field_length%%"
+plot_type="%%PLOT_TYPE%%"
+t_steps_multi_TS="%%t_steps_multi_TS%%"
+
+# ======= Module to load =======
+module_to_load="%%module_to_load%%"
+
+# ============ Files ===========
+initialization_file="%%initialization_file%%"
+nodes_info_file="%%nodes_info_file%%"
+plot_script="%%plot_script%%"
+encoding_file_name_script="%%encoding_file_name_script%%"
+depths_tmp="%%depths_tmp%%"
+
+d1_L_table="%%d1_L_table%%"
+d2_L_table_tpl="%%d2_L_table_tpl%%"
+d345_L_table_tpl="%%d345_L_table_tpl%%"
+
+d12345_V_table="%%d12345_V_table%%"
+
+d1_E_table="%%d1_E_table%%"
+
+# ======= File name templates ========
+input_temp3d_file_tpl="%%input_temp3d_file_tpl%%"
+input_sal3d_file_tpl="%%input_salt3d_file_tpl%%"
+input_zeta2d_file_tpl="%%input_zeta2d_file_tpl%%"
+graph_file_name_out_tpl="%%graph_file_name_out_tpl%%"
+
+# =========== Directories ============
+data_dir="%%data_dir%%"
+tmp_root_dir="%%tmp_root_dir%%"
+conf_script_dir="%%conf_script_dir%%"
+output_dir="%%output_dir%%"
+script_root_dir="%%script_root_dir%%"
+
+# ---- Module loading section ----
+module load ${module_to_load}  1>/dev/null || { echo "WARNING: The module \"${module_to_load}\" could not be loaded."; ERROR; }
+
+cd $tmp_root_dir  || { echo "ERROR: I can't move to \"$tmp_root_dir\"."; ERROR; }
+
+#====================================================================================================
+
+if [[  ! "time_series_temp_PYTHON   time_series_sal_PYTHON   time_series_temp_multy_day_PYTHON   time_series_sal_multy_day_PYTHON  \
+          time_series_lines_temp_sal_PYTHON   time_series_lines_temp_sal_multy_day_PYTHON  time_series_lines_height_multy_day_PYTHON" =~ "${plot_type}" ]]; then
+
+    i=1
+    while IFS=';' read -r   node_label   time_a
+    do
+
+        if [[ -z "$node_label" ]] || [[ -z "$time_a" ]] ; then
+            echo "WARNING: node: $node_label or time: $time_a not inserted at line $i."
+            echo "The initialization file format must be: \"node_label;hh:mm\" or \"node_label;hh:mm:ss\"."; (( i++ )); continue;
+        fi
+
+        # remove leading and trailing blank spaces
+        time_a="$(     sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${time_a}" )"
+        node_label="$( sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${node_label}" )"
+
+        echo -e "\nThe node at line $i is: ${node_label} and the time is: ${time_a}."
+
+        declare -a info_node
+
+        # i  node(shy idx)  il   hdep  lon  lat  node_label
+        info_node=(  $( grep --max-count=1  ${node_label}  "${data_dir}/${nodes_info_file}" )  )
+
+        # node check
+        if [[ ${#info_node[@]} -eq 0 ]]; then echo "WARNING: ${node_label} node inserted at line $i doesn't exist."; (( i++ )); continue; fi
+
+        # time check
+        if [[ "${time_a}" != 2[0-3]:[0-5][0-9]:[0-5][0-9] && "${time_a}" != [01][0-9]:[0-5][0-9]:[0-5][0-9] && \
+              "${time_a}" != 2[0-3]:[0-5][0-9]            && "${time_a}" != [01][0-9]:[0-5][0-9] ]]; then
+            echo "WARNING: ${time_a} time format (or value) not supported at line $i in \"${conf_script_dir}/${initialization_file}\". Time format must be 'hh:mm' or 'hh:mm:ss'."; 
+            (( i++ )); continue;
+        fi
+
+        time_a="${time_a:0:5}"
+
+        input_temp3d_file="${input_temp3d_file_tpl//%node_idx%/${info_node[0]}}"
+        input_sal3d_file="${input_sal3d_file_tpl//%node_idx%/${info_node[0]}}"
+
+        # Bulletin time and time resolution extraction
+        frst_line=( $( sed -n 1p "${data_dir}/${input_temp3d_file}" | sed "s/::/ /g" ) )
+        scnd_line=( $( sed -n 2p "${data_dir}/${input_temp3d_file}" | sed "s/::/ /g" ) )
+        time_b="${frst_line[1]:0:5}"    # to select only hh:mm part. Not seconds
+        s_frst=$( date -u -d"${frst_line[0]} ${frst_line[1]}" +%s )
+        s_scnd=$( date -u -d"${scnd_line[0]} ${scnd_line[1]}" +%s )
+        # time resolution in minutes only
+        time_resolution=$( date -u -d "0 $s_scnd seconds - $s_frst seconds" +"%M" )
+
+
+        # Time approximation when minutes are not a multiple of SHYFEM resolution ( e.g 00, 15, 30, 45 in the case of a 15 minutes resolution )
+        min_extra=$(( ${time_a:3:2} % time_resolution ))
+
+        if [[ $min_extra -ne 0 ]]; then
+
+            if [[ $min_extra -gt $(( time_resolution / 2 )) ]]; then
+                echo "Minutes in \"$time_a\" (at line $i) will be over-approximated."
+                time_a="${time_a:0:2}:$(( ${time_a:3:2} + ( time_resolution - min_extra ) ))"
+            else
+                echo "Minutes in \"$time_a\" (at line $i) will be under-approximated."
+                time_a="${time_a:0:2}:$(( ${time_a:3:2} -        min_extra   ))"
+            fi
+
+            echo -e "Time resolution of SHYFEM output is $time_resolution minutes long. The time (at line $i) will be approximated to: ${time_a}\n"
+        fi
+
+        # ========================================================================================================================
+        #                                                    Temporary files creation
+        # ========================================================================================================================
+
+        file_temp_tmp="$( mktemp file_temp_tmp.XXXX )"
+        file_sal_tmp="$(  mktemp file_sal_tmp.XXXX  )"
+        data_TS_tmp="$(   mktemp data_TS_tmp.XXXX   )"
+
+        # --- Data extraction ---
+        if [[ "${plot_type}" != "TS_multi_diagram_NCL" ]]; then  
+
+            grep --max-count=1 "${YYYYF}-${MMF}-${DDF}::${time_a}"  "${data_dir}/${input_temp3d_file}" | tr -s " " "\n" | sed 1d  > $file_temp_tmp
+            grep --max-count=1 "${YYYYF}-${MMF}-${DDF}::${time_a}"  "${data_dir}/${input_sal3d_file}"  | tr -s " " "\n" | sed 1d  > $file_sal_tmp
+
+            if [[ ! -s "$file_temp_tmp" ]] || [[ ! -s "$file_sal_tmp" ]]; then
+                echo "There is no data for temperature and/or salinity according to ${node} at time ${time_a} at line $i. TS diagram can't be done."
+                (( i++ ))
+                continue
+            fi
+
+            paste -d';' $depths_tmp  $file_temp_tmp $file_sal_tmp | egrep --invert-match ';;|^;|;$' > $data_TS_tmp
+
+        else   # this is the "TS_multi_diagram_NCL" data extraction
+
+            temp_match_line=$( grep --max-count=1 -n "${YYYYF}-${MMF}-${DDF}::${time_a}"  "${data_dir}/${input_temp3d_file}" | awk -F':' '{ print $1 }' )
+            sal_match_line=$(  grep --max-count=1 -n "${YYYYF}-${MMF}-${DDF}::${time_a}"  "${data_dir}/${input_sal3d_file}"  | awk -F':' '{ print $1 }' )
+
+            # --- temp ---
+            line_temp_in=$((  temp_match_line - (   t_steps_multi_TS - 1 ) / 2 ))
+            line_temp_fin=$(( temp_match_line + ( ( t_steps_multi_TS - 1 ) / 2 + ( t_steps_multi_TS - 1 ) % 2 ) ))
+
+            if [[ $line_temp_in  -lt 1 ]]; then line_temp_in=1; fi
+            if [[ $line_temp_fin -gt $(  wc -l ${data_dir}/${input_temp3d_file} | awk -F' ' '{ print $1 }' ) ]]; then
+                line_temp_fin=$(         wc -l ${data_dir}/${input_temp3d_file} | awk -F' ' '{ print $1 }' )
+            fi
+
+            # --- sal ---
+            line_sal_in=$((  sal_match_line  - (   t_steps_multi_TS - 1 ) / 2 ))
+            line_sal_fin=$(( sal_match_line  + ( ( t_steps_multi_TS - 1 ) / 2 + ( t_steps_multi_TS - 1 ) % 2 ) ))
+
+            if [[ $line_sal_in  -lt 1 ]]; then line_sal_in=1; fi
+            if [[ $line_sal_fin -gt $(  wc -l ${data_dir}/${input_sal3d_file} | awk -F' ' '{ print $1 }' ) ]]; then
+                line_sal_fin=$(         wc -l ${data_dir}/${input_sal3d_file} | awk -F' ' '{ print $1 }' )
+            fi
+
+            declare -a line_temp_indx   line_sal_indx
+            line_temp_indx=( $( seq $line_temp_in $line_temp_fin ) )
+            line_sal_indx=(  $( seq $line_sal_in  $line_sal_fin  ) )
+
+
+            for j in $( seq 0 $(( line_temp_fin - line_temp_in )) ); do
+                sed -n "${line_temp_indx[${j}]}p" "${data_dir}/${input_temp3d_file}" | tr -s " " "\n" | sed 1d    >  $file_temp_tmp
+                sed -n "${line_sal_indx[${j}]}p"  "${data_dir}/${input_sal3d_file}"  | tr -s " " "\n" | sed 1d    >  $file_sal_tmp
+                paste -d';' $depths_tmp  $file_temp_tmp  $file_sal_tmp | egrep --invert-match ';;|^;|;$'  >> $data_TS_tmp
+            done
+
+            unset  line_temp_indx  line_sal_indx  temp_match_line  sal_match_line  line_temp_in  line_temp_fin  line_sal_in  line_sal_fin
+
+        fi
+
+        # =============== File name creation (encoding process) ===============
+
+        graph_file_name_out="$( ${script_root_dir}/${encoding_file_name_script}  $plot_type           $node_label         $conf_script_dir          $d1_L_table               \
+                                                                                 $d2_L_table_tpl      $d345_L_table_tpl   $d12345_V_table           $d1_E_table               \
+                                                                                 $time_b              $DATEB              $time_a                   $time_a                   \
+                                                                                 $day_f               $day_f              $code_field_length        $graph_file_name_out_tpl  \
+                                                                                 $time_resolution     $t_steps_multi_TS   'png' )"
+
+        # ========================= PLOT SCRIPT LAUNCH ========================
+
+        if [[ "${plot_type}" == "TS_diagram_NCL" ]]; then
+
+            echo -e "$plot_type script for: $node_label at time:$time_a (line $i of initialization file) is starting right now. The output file name is: $graph_file_name_out."
+
+            ncl -Q < "${script_root_dir}/${plot_script}"               data_input_file=\"${tmp_root_dir}/${data_TS_tmp}\"    output_dir=\"${output_dir}\"           \
+                                                                       node_name=\"${node_label}\"                           date_f=\"$DATEF\"                      \
+                                                                       time_f=\"${time_a}\"                                  date_b=\"$DATEB\"                      \
+                                                                       time_b=\"$time_b\"                                    latitude=\"${info_node[5]}\"           \
+                                                                       longitude=\"${info_node[4]}\"                         output_file=\"${graph_file_name_out}\"
+
+            echo -e "NCL TS-diagram script for: $node_label at time:$time_a (line $i of initialization file) is just finished.\n"
+
+        fi
+
+        if [[ "${plot_type}" == "TS_multi_diagram_NCL" ]]; then
+
+            echo -e "NCL Multi-TS-diagram script for: $node_label at time:$time_a (line $i of initialization file) is starting right now."
+
+            ncl -Q < "${script_root_dir}/${plot_script}"               data_input_file=\"${tmp_root_dir}/${data_TS_tmp}\"    output_dir=\"${output_dir}\"           \
+                                                                       node_name=\"${node_label}\"                           date_f=\"$DATEF\"                      \
+                                                                       time_f=\"${time_a}\"                                  date_b=\"$DATEB\"                      \
+                                                                       time_b=\"$time_b\"                                    latitude=\"${info_node[5]}\"           \
+                                                                       longitude=\"${info_node[4]}\"                         output_file=\"${graph_file_name_out}\"
+
+            echo -e "NCL Multi-TS-diagram script for: $node_label at time:$time_a (line $i of initialization file) is just finished.\n"
+
+        fi
+
+        if [[ "${plot_type}" == "profiles_PYTHON" ]]; then
+
+            echo -e "Python profiles script for: $node_label at time:$time_a (line $i of initialization file) is starting right now."
+
+            # args: data_input_file, output_dir, node_name, date_f, time_f, date_b, time_b, latitude, longitude
+            python "${script_root_dir}/${plot_script}"                "${tmp_root_dir}/${data_TS_tmp}"                      "${output_dir}"                         \
+                                                                      "${node_label}"                                       "$DATEF"                                \
+                                                                      "${time_a}"                                           "$DATEB"                                \
+                                                                      "$time_b"                                             "${info_node[4]}"                       \
+                                                                      "${info_node[5]}"                                     "${graph_file_name_out}"
+
+            echo -e "Python profiles script for: $node_label at time:$time_a (line $i of initialization file) is just finished.\n"
+        fi
+
+
+        unset  info_node  frst_line
+        rm     $file_temp_tmp  $file_sal_tmp  $data_TS_tmp || echo "WARNING: I can't remove temporary files: ${file_temp_tmp} and/or ${file_sal_tmp} and/or ${data_TS_tmp}."
+        (( i++ ))
+
+
+    done < "${conf_script_dir}/${initialization_file}"
+
+#=========================================================================================================================================
+else
+    # job part reserved for time-series temperature and salinity
+    # day_in and day_fin goes from 0 to 4 (5 forecast days). 0 is the bulletin day and 4 is the last day of forecast. 
+    i=1
+    while IFS=';' read -r   node_label   time_in   time_fin   day_in   day_fin
+    do
+
+        if [[ -z "$node_label" ]] || [[ -z "$time_in" ]] || [[ -z "$time_fin" ]] ; then
+            echo "WARNING: node: $node_label, time: $time_in or $time_fin not inserted at line $i."
+            echo "The initialization file format must be: \"node_label;hh:mm\" or \"node_label;hh:mm:ss\"."; (( i++ )); continue;
+        fi
+
+        # remove leading and trailing blank spaces
+        time_in="$(     sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${time_in}" )"
+        time_fin="$(    sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${time_fin}" )"
+        node_label="$(  sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${node_label}" )"
+
+        echo -e "\nThe node at line $i is: ${node_label} and the starting time is: ${time_in} and the ending time is: ${time_fin}."
+
+        declare -a info_node
+
+        # i  node(shy idx)  il   hdep  lon  lat  node_label
+        info_node=(  $( grep --max-count=1  ${node_label}  "${data_dir}/${nodes_info_file}" )  )
+
+        # node check
+        if [[ ${#info_node[@]} -eq 0 ]]; then echo "WARNING: ${node_label} node inserted at line $i doesn't exist."; (( i++ )); continue; fi
+
+        # time_in check
+        if [[ "${time_in}" != 2[0-3]:[0-5][0-9]:[0-5][0-9] && "${time_in}" != [01][0-9]:[0-5][0-9]:[0-5][0-9] && \
+              "${time_in}" != 2[0-3]:[0-5][0-9]            && "${time_in}" != [01][0-9]:[0-5][0-9] ]]; then
+            echo "WARNING: ${time_in} time format (or value) not supported at line $i in \"${conf_script_dir}/${initialization_file}\". Time format must be 'hh:mm' or 'hh:mm:ss'.";
+            (( i++ ))
+            continue
+        fi
+
+        time_in="${time_in:0:5}"
+
+        # time_fin check
+        if [[ "${time_fin}" != 2[0-3]:[0-5][0-9]:[0-5][0-9] && "${time_fin}" != [01][0-9]:[0-5][0-9]:[0-5][0-9] && \
+              "${time_fin}" != 2[0-3]:[0-5][0-9]            && "${time_fin}" != [01][0-9]:[0-5][0-9] ]]; then
+            echo "WARNING: ${time_fin} time format (or value) not supported at line $i in \"${conf_script_dir}/${initialization_file}\". Time format must be 'hh:mm' or 'hh:mm:ss'."; 
+            (( i++ ))
+            continue
+        fi
+
+        time_fin="${time_fin:0:5}"  
+ 
+        input_temp3d_file="${input_temp3d_file_tpl//%node_idx%/${info_node[0]}}"
+        input_sal3d_file="${input_sal3d_file_tpl//%node_idx%/${info_node[0]}}"
+        input_zeta2d_file="${input_zeta2d_file_tpl//%node_idx%/${info_node[0]}}"
+
+        # Bulletin time and time resolution extraction
+        frst_line=( $( sed -n 1p "${data_dir}/${input_temp3d_file}" | sed "s/::/ /g" ) )
+        scnd_line=( $( sed -n 2p "${data_dir}/${input_temp3d_file}" | sed "s/::/ /g" ) )
+        time_b="${frst_line[1]:0:5}"    # to select only hh:mm part. Not seconds
+        s_frst=$( date -u -d"${frst_line[0]} ${frst_line[1]}" +%s )
+        s_scnd=$( date -u -d"${scnd_line[0]} ${scnd_line[1]}" +%s )
+        # time resolution in minutes only
+        time_resolution=$( date -u -d "0 $s_scnd seconds - $s_frst seconds" +"%M" )
+
+        # the bulletin date forecast starts with a particular time that can be different from 00:00:00. So time_in can't be earlier than time_b
+        if   [[ "${time_in}" < "${time_b}" && "${DATEB}" == "${DATEF}" && ! "${plot_type}" =~ "multy" ]]; then 
+            echo "${time_in} for ${DATEB} (at line $i) will be over-approximated to ${time_b}."; time_in="${time_b}";
+        elif [[ "${time_in}" < "${time_b}" && $day_in -eq 0 && "${plot_type}" =~ "multy" ]]; then
+            echo "${time_in} for ${day_in} day_in (at line $i) will be over-approximated to ${time_b}. It can be earlyer than the first time-step."; time_in="${time_b}";
+        fi
+
+        # Time approximation when minutes are not a multiple of SHYFEM resolution ( e.g 00, 15, 30, 45 in the case of a 15 minutes resolution )
+        min_extra=$(( ${time_in:3:2} % time_resolution ))
+
+        if [[ $min_extra -ne 0 ]]; then
+
+            if [[ $min_extra -gt $(( time_resolution / 2 )) ]]; then
+                echo "Minutes in \"$time_in\" (at line $i) will be over-approximated."
+                time_in="${time_in:0:2}:$(( ${time_in:3:2} + ( time_resolution - min_extra ) ))"
+            else
+                echo "Minutes in \"$time_in\" (at line $i) will be under-approximated."
+                time_in="${time_in:0:2}:$(( ${time_in:3:2} -        min_extra   ))"
+            fi
+
+            echo -e "Time resolution of SHYFEM output is $time_resolution minutes long. The time (at line $i) will be approximated to: ${time_in}\n"
+        fi
+
+        # Time approximation when minutes are not a multiple of SHYFEM resolution ( e.g 00, 15, 30, 45 in the case of a 15 minutes resolution )
+        min_extra=$(( ${time_fin:3:2} % time_resolution ))
+
+        if [[ $min_extra -ne 0 ]]; then
+
+            if [[ $min_extra -gt $(( time_resolution / 2 )) ]]; then
+                echo "Minutes in \"$time_fin\" (at line $i) will be over-approximated."
+                time_fin="${time_fin:0:2}:$(( ${time_fin:3:2} + ( time_resolution - min_extra ) ))"
+            else
+                echo "Minutes in \"$time_fin\" (at line $i) will be under-approximated."
+                time_fin="${time_fin:0:2}:$(( ${time_fin:3:2} -        min_extra   ))"
+            fi
+
+            echo -e "Time resolution of SHYFEM output is $time_resolution minutes long. The time (at line $i) will be approximated to: ${time_fin}\n"
+        fi
+
+        # =============== File name creation (encoding process) ===============
+
+        if [[ "${plot_type}" == "time_series_temp_PYTHON" || "${plot_type}" == "time_series_sal_PYTHON" || "${plot_type}" == "time_series_lines_temp_sal_PYTHON" ]]; then 
+            day_in=$day_f; day_fin=$day_f; 
+        fi
+
+        graph_file_name_out="$( ${script_root_dir}/${encoding_file_name_script}  $plot_type           $node_label         $conf_script_dir          $d1_L_table               \
+                                                                                 $d2_L_table_tpl      $d345_L_table_tpl   $d12345_V_table           $d1_E_table               \
+                                                                                 $time_b              $DATEB              $time_in                  $time_fin                 \
+                                                                                 $day_in              $day_fin            $code_field_length        $graph_file_name_out_tpl  \
+                                                                                 $time_resolution     $t_steps_multi_TS   'png'  '0' )"
+
+
+        # ========================= PLOT SCRIPT LAUNCH ========================
+
+        if [[ "${plot_type}" == "time_series_temp_PYTHON" || "${plot_type}" == "time_series_sal_PYTHON" ]]; then
+
+            echo -e "$plot_type script for: $node_label from $time_in to $time_fin (line $i of init file) is starting right now. The output file name is: $graph_file_name_out."
+            if   [[ "${plot_type}" == "time_series_temp_PYTHON" ]]; then input_data_file="${input_temp3d_file}"; 
+            elif [[ "${plot_type}" == "time_series_sal_PYTHON"  ]]; then input_data_file="${input_sal3d_file}" ; fi 
+
+            # args: data_input_file, output_dir, node_name, date_f, time_f, date_b, time_b, latitude, longitude
+            python "${script_root_dir}/${plot_script}"                "${data_dir}/${input_data_file}"                      "${output_dir}"                         \
+                                                                      "${node_label}"                                       "$DATEF"                                \
+                                                                      "${time_in}"                                          "${time_fin}"                           \
+                                                                      "$DATEB"                                              "$time_b"                               \
+                                                                      "${info_node[4]}"                                     "${info_node[5]}"                       \
+                                                                      "${graph_file_name_out}"                              "${tmp_root_dir}/${depths_tmp}"
+
+        fi
+
+
+        if [[ "${plot_type}" == "time_series_temp_multy_day_PYTHON" || "${plot_type}" == "time_series_sal_multy_day_PYTHON" ]]; then
+
+            if [[ "$day_fin" -lt "$day_in" ]]; then echo -e "\n\tWARNING: $day_fin can't be less than $day_in (at line $i) of ${initialization_file}.\n"; (( i++ )); continue; fi
+
+            echo -e "$plot_type script for: $node_label from $time_in to $time_fin (line $i of initialization file) is starting right now."
+            if   [[ "${plot_type}" == "time_series_temp_multy_day_PYTHON" ]]; then input_data_file="${input_temp3d_file}";
+            elif [[ "${plot_type}" == "time_series_sal_multy_day_PYTHON"  ]]; then input_data_file="${input_sal3d_file}" ; fi
+
+            # args: data_input_file, output_dir, node_name, date_f, time_f, date_b, time_b, latitude, longitude
+            python "${script_root_dir}/${plot_script}"                "${data_dir}/${input_data_file}"                      "${output_dir}"                         \
+                                                                      "${node_label}"                                       "$day_in"                               \
+                                                                      "${day_fin}"                                          "${time_in}"                            \
+                                                                      "$time_fin"                                           "$DATEB"                                \
+                                                                      "$time_b"                                             "${info_node[4]}"                       \
+                                                                      "${info_node[5]}"                                     "${graph_file_name_out}"                \
+                                                                      "${tmp_root_dir}/${depths_tmp}"
+        fi
+
+        if [[ "${plot_type}" == "time_series_lines_temp_sal_PYTHON" ]]; then
+
+            echo -e "Python profiles script for: $node_label at time:$time_a (line $i of initialization file) is starting right now."
+
+            # args: data_input_file, output_dir, node_name, date_f, time_f, date_b, time_b, latitude, longitude
+            python "${script_root_dir}/${plot_script}"                "${data_dir}/${input_temp3d_file}"                    "${data_dir}/${input_sal3d_file}"       \
+                                                                      "${output_dir}"                                       "${node_label}"                         \
+                                                                      "$DATEF"                                              "${time_in}"                            \
+                                                                      "${time_fin}"                                         "$DATEB"                                \
+                                                                      "${time_b}"                                           "${info_node[4]}"                       \
+                                                                      "${info_node[5]}"                                     "${graph_file_name_out}"                \
+                                                                      "${tmp_root_dir}/${depths_tmp}"
+
+            echo -e "Python profiles script for: $node_label at time:$time_a (line $i of initialization file) is just finished.\n"
+        fi
+
+        if [[ "${plot_type}" == "time_series_lines_temp_sal_multy_day_PYTHON" ]]; then
+
+            if [[ "$day_fin" -lt "$day_in" ]]; then echo -e "\n\tWARNING: $day_fin can't be less than $day_in (at line $i) of ${initialization_file}.\n"; (( i++ )); continue; fi
+
+            echo -e "$plot_type script for: $node_label from $time_in to $time_fin (line $i of initialization file) is starting right now."
+
+            # args: data_input_file, output_dir, node_name, date_f, time_f, date_b, time_b, latitude, longitude
+            python "${script_root_dir}/${plot_script}"                "${data_dir}/${input_temp3d_file}"                    "${data_dir}/${input_sal3d_file}"       \
+                                                                      "${output_dir}"                                       "${node_label}"                         \
+                                                                      "${day_in}"                                           "${day_fin}"                            \
+                                                                      "${time_in}"                                          "${time_fin}"                           \
+                                                                      "$DATEB"                                              "${time_b}"                             \
+                                                                      "${info_node[4]}"                                     "${info_node[5]}"                       \
+                                                                      "${graph_file_name_out}"                              "${tmp_root_dir}/${depths_tmp}"
+        fi
+
+        if [[ "${plot_type}" == "time_series_lines_height_multy_day_PYTHON" ]]; then
+
+            if [[ "$day_fin" -lt "$day_in" ]]; then echo -e "\n\tWARNING: $day_fin can't be less than $day_in (at line $i) of ${initialization_file}.\n"; (( i++ )); continue; fi
+
+            echo -e "$plot_type script for: $node_label from $time_in to $time_fin (line $i of initialization file) is starting right now."
+
+            # args: data_input_file, output_dir, node_name, date_f, time_f, date_b, time_b, latitude, longitude
+            python "${script_root_dir}/${plot_script}"                "${data_dir}/${input_zeta2d_file}"                    "${output_dir}"                         \
+                                                                      "${node_label}"                                       "${day_in}"                             \
+                                                                      "${day_fin}"                                          "${time_in}"                            \
+                                                                      "${time_fin}"                                         "$DATEB"                                \
+                                                                      "${time_b}"                                           "${info_node[4]}"                       \
+                                                                      "${info_node[5]}"                                     "${graph_file_name_out}"                \
+                                                                      "${info_node[3]}"
+        fi
+
+
+    done < "${conf_script_dir}/${initialization_file}"
+
+fi

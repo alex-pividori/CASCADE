@@ -1,0 +1,84 @@
+# ==============================================================================
+#            This is the MANUAL for the "buoy_bufr_conversion" family
+# ==============================================================================
+
+This is the manual for the "buoy_bufr_conversion" family contained in the
+"bufr_conversion" suite. This family has been designed to manage the two
+following kinds of buoys data: "nke_wimo" and "cortek". These buoys data
+present a particular file format that Python can read, interpret and convert in
+the BUFR binary format. If you want to know more about BUFR format architecture,
+you can find a lot of information on-line. Some useful web-sites are the
+following, but there are many other sources:
+
+ - https://etrp.wmo.int/pluginfile.php/30810/mod_resource/content/1/Bufr_decoding.pdf
+ - https://confluence.ecmwf.int/download/attachments/35752427/bufr_user_guide.pdf
+
+BUFR format files are managed by the "ecCodes" software, which is distributed
+by ECMWF ( https://www.ecmwf.int/en/learning/training/eccodes-grib-and-bufr-data-decoding-and-encoding-software ).
+Another important tool for BUFR encoding end decoding is the "eccodes" Python
+module. You can find a brief description of the functions contained in this
+module by following the link below:
+http://download.ecmwf.int/test-data/eccodes/html/namespaceec_codes.html
+
+The result of the conversion is stored in dedicated output directories. The
+conversion process is launched with daily frequence and a backwards conversion 
+until N days is performed to prevent possible data transmission dalays. For
+more informations about the suite design, please consult the task manuals.
+
+
+The goal of this family is to encode in-situ measured raw data from CSV or MIS
+formats to the BUFR binary format ( https://rda.ucar.edu/datasets/ds476.0/docs/bufr_usr_guide.pdf;
+https://en.wikipedia.org/wiki/BUFR ). The process is carried out through the
+"eccodes" environmental module (eccodes/2.13.0/intel/19.1.1.217-ip7puyk) and
+the "eccodes" Python module. These software are freely downloadable from the
+ECMWF official site ( https://confluence.ecmwf.int ).
+
+
+A partial documentation of these tools is available at: 
+- eccodes tool-set, https://confluence.ecmwf.int/display/ECC/Documentation
+- eccodes Python module, http://download.ecmwf.int/test-data/eccodes/html/namespaceec_codes.html
+
+
+There are two kinds or raw data measured by buoys. 
+
+ - cortek buoys:    these are two stable buoys positioned inside the
+                    Marano-Grado lagoon. The labels are:
+                    - RFVGCORON4 ( 45.70965 °N 13.11657 °E )
+                    - AFVGBARBAN ( 45.70011 °N 13.41402 °E )
+
+                    The raw data transmitted by the buoys are memorized in MIS
+                    (.mis) format. The sampling period is 10 minutes and the
+                    physical quantities stored are:
+
+                    - Code 0001 Voltage supply [V]
+   	            - Code 0002 Inner Gauge Temperature [°C]
+	            - Code 1000 Water Temperature [°C]
+	            - Code 1001 Specific conductivity at 25°C [mS/cm]
+	            - Code 1002 Salinity [PSU]
+	            - Code 1003 Water Turbidity [NTU]
+	            - Code 1004 Depth [m]
+                    - Code 2001 Sea level height respect to a specific
+                                reference value [m]
+
+ - nke-wimo buoys:  these are three anchored buoys positioned inside the
+                    Marano-Grado lagoon. The labels are:
+                    5228, 5229, 522f      
+
+                    The lat/lon coordinate GPS position is archived in <xml>
+                    format with the ".gpx" extension.
+                 
+                    The sampling period is 15 minutes long and the physical
+                    quantities measured and transmitted are:
+
+                    - Pressure [dbar]
+	            - pH [pH]
+	            - Oxygen Concentration [mg/L]
+	            - Oxygen Saturation [%%]
+		    - Conductivity [mS/cm]
+		    - Temperature [°C]
+		    - Practical Salinity [PSU]
+		    - Depth [m]
+
+                    Some units of measurement have been changed during the
+                    encoding process due to the unit restriction introduced by
+                    BUFR table.

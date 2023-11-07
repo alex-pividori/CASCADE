@@ -1,0 +1,183 @@
+#!/bin/bash
+
+#******************************************************************************
+#
+# DESCRIPTION:       This bash script is used to external from netCDF files
+#                    the vertical measure in a single point in Adriatic Sea
+#                    put the data in an external .txt file that will be 
+#                    processed by R to calculate some statistical important tests
+#
+# EXTERNAL CALLS:   none.
+#
+# EXTERNAL FILES:   - input NetCDF data file
+#                     Containing whatever
+#                   - DATA ASCII file provided by Massimo Celio
+#
+# DEVELOPER:         Alex Pividori (alex.pividori@arpa.fvg.it)
+#                    ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#                   "AdriaClim" Interreg IT-HR project
+#
+# SOFTWARE VERSION: Bash
+#                   CDO version 1.9.8
+#
+# CREATION DATE:    16/08/2021
+#
+# MODIFICATIONS:    05/10/2021 --> Transformation into a job
+#
+# VERSION:          0.1.
+#
+#******************************************************************************
+
+#PBS -N sel_drops
+#PBS -o stdout_T
+#PBS -e stderr_T
+#PBS -P CASCADE
+#PBS -W umask=0002
+#PBS -q arpa
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=00:20:00
+##PBS -m abe
+##PBS -M alex.pividori@arpa.fvg.it
+#PBS -W block=true
+
+cd     %%tmp_dir_root%%
+module load %%cdo_module%%
+
+point_name="%%point_name%%"
+find_arc_dir="%%find_arc_dir%%"
+output_d="%%drops_files_dir%%"
+
+i=1
+n_elem=0
+time_old="0"
+time_new="0"
+n_lines=$(wc -l < ${output_d}/list_lines.txt )
+netCDF_file="votemper-adriaclim_resm_nemo_historical_day_T_depth_19920101_12-20201230_12.nc"
+
+#===============================================================================================
+
+if [[ -f "$output_d/list_files_TEMP.txt"  ]]; then rm "$output_d/list_files_TEMP.txt"; fi
+
+#========================= A first drop measure will be extracted ==============================
+
+while [ $i -le $(( n_lines + 1 )) ] ; do           # the last cycle is necessary to launch the cdo interpolation for the last drop present 
+                                                   # inside list_lines.txt file
+
+	if [[ "$time_old" == "$time_new" ]] && [[ $i -le $n_lines ]]; then
+
+   	        ser_code=$( sed -n "${i}p"          $output_d/list_lines.txt | awk -F ";"   '{ print $7 }' )
+
+       	        time_old=$( sed -n "${i}p"          $output_d/list_lines.txt | awk -F ";"   '{ print $4 }' )
+    	        time_new=$( sed -n "$(( i + 1 ))p"  $output_d/list_lines.txt | awk -F ";"   '{ print $4 }' )
+
+      	        lat_m=$( sed -n "${i}p"          $output_d/list_lines.txt | awk -F ";"   '{ print $6 }' )
+      	        lon_m=$( sed -n "${i}p"          $output_d/list_lines.txt | awk -F ";"   '{ print $5 }' )
+
+ 	        date_time=$( sed -n "${i}p"          $output_d/list_lines.txt | awk -F ";"   '{ print $4 }' )
+
+     	        date_m=$( cut -f 1 -d "T" <<<"$date_time" )
+    	        time_m=$( cut -f 2 -d "T" <<<"$date_time" )
+
+    	        depth=$( sed -n "${i}p"          $output_d/list_lines.txt | awk -F ";"   '{ print $9  }' )
+       	        temp=$(  sed -n "${i}p"          $output_d/list_lines.txt | awk -F ";"   '{ print $10 }' )
+
+                if [[ "$time_old" == "$time_new" ]] || [[ $i -eq $n_lines ]]; then i=$(( i + 1 )); fi
+
+		if [[ $depth < "0.4127" ]]; then  # 0.25  depths are skipped
+                    continue
+	 	else
+ 	            depth_val[${n_elem}]=$depth
+ 	            n_elem=$(( n_elem + 1 ))
+ 	            echo "${ser_code};${lat_m};${lon_m};${date_m};${time_m};${depth};${temp}" >> "${output_d}/${ser_code}_${date_m}_${time_m}_m_TEMP.txt"
+		fi
+
+	else   # the measured drop is finished. Now the code pass to the model data-part
+
+     echo -e "\n\t cdo analysis for the single drop of $ser_code station in $date_time is starting"
+
+     n_elem=0
+     i=$(( i + 1 ))   # i index must be incremented in the if and in the else statement
+
+#=====================================================================================
+#           Creation of comparison file from COPERNICUS MARINE netCDF files
+#=====================================================================================
+
+
+echo -e "\n\t The netCDF TEMP file  used is \"$netCDF_file\" \n"
+
+case $point_name in 
+SMLG2)
+index_lat=27
+index_lon=30
+;;
+SMLG3)
+index_lat=24
+index_lon=34
+;;
+ME221)
+index_lat=29
+index_lon=31
+;;
+SMTS3)
+index_lat=27
+index_lon=42
+;;
+F464)
+index_lat=29
+index_lon=45
+;;
+P555)
+index_lat=28
+index_lon=46
+;;
+SMTS1)
+index_lat=29
+index_lon=53
+;;
+MA311)
+index_lat=29
+index_lon=52
+;;
+fll_bandiera)
+index_lat=29
+index_lon=55
+;;
+esac
+
+
+# interpolate levels withoux extrapolation
+cdo outputf,%2.4g,1 -intlevel$( printf ',%s'  "${depth_val[@]}" )  -inttime,${date_m},${time_m} -selname,votemper  \
+                    -selindexbox,$index_lon,$index_lon,$index_lat,$index_lat  $find_arc_dir/$netCDF_file > "$output_d/${ser_code}_${date_m}_${time_m}_f_TEMP.txt"            
+
+#===============================================================================
+#                PASTE the TWO files: measure and forecasts
+#===============================================================================
+
+paste -d ";" "$output_d/${ser_code}_${date_m}_${time_m}_m_TEMP.txt"     "$output_d/${ser_code}_${date_m}_${time_m}_f_TEMP.txt" \
+           > "$output_d/${ser_code}_${date_m}_${time_m//:/-}_TEMP.txt"
+
+echo -e "\n\t File \"${ser_code}_${date_m}_${time_m//:/-}_TEMP.txt\" is now available for forward analysis"
+
+if [[ -f $output_d/${ser_code}_${date_m}_${time_m}_m_TEMP.txt  ]]; then rm "$output_d/${ser_code}_${date_m}_${time_m}_m_TEMP.txt"; fi 
+if [[ -f $output_d/${ser_code}_${date_m}_${time_m}_f_TEMP.txt  ]]; then rm "$output_d/${ser_code}_${date_m}_${time_m}_f_TEMP.txt"; fi
+
+val=$( awk "BEGIN { print $( sed -n "1p"   "$output_d/${ser_code}_${date_m}_${time_m//:/-}_TEMP.txt"  | awk -F ";"   '{ print $8 }' ) }" )
+
+if [[ ${val%%.*} -lt 1000000 ]]; then               # the missing value is 1e+20 but also 1000000 could be fine
+    echo "${ser_code}_${date_m}_${time_m//:/-}_TEMP.txt" >> $output_d/list_files_TEMP.txt   # file creation with the names of the files
+else
+    rm   "$output_d/${ser_code}_${date_m}_${time_m//:/-}_TEMP.txt"
+    echo -e "\t File \"${ser_code}_${date_m}_${time_m//:/-}_TEMP.txt\" has been removed due to external to model domain."
+fi
+
+#************** reinitialize variables ************************
+
+unset depth_val
+time_new="0"
+time_old="0"
+
+fi
+
+done
+
+echo -e "\n"

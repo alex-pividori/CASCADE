@@ -1,0 +1,174 @@
+# Include the manual of this task
+%manual
+%include <man/csv_postproc.man>
+%end
+
+%include <qsub_4_bash.h>
+
+%include <head_4_bash.h>                                # Include header common to all tasks. 
+                                                        # It manages general calls to ecflow client
+%include <etc/general.ini>
+
+#====================================================================================================
+
+cd ${tmp_root_dir} || echo "It's not possible to move to \"${tmp_root_dir}\" working directory." && echo "Now I'm in the \"$tmp_root_dir\" working directory."
+
+# Current date (UCT) from ecflow variable
+DATE="%ECF_DATE%" 
+
+# Bulletin date (label)
+DATEB=$( date -u -d "$DATE $bulletin_date_delta" +%%Y%%m%%d )
+
+YYYYB="${DATEB:0:4}"
+MMB="${DATEB:4:2}"
+DDB="${DATEB:6:2}"
+
+DATEB_label="${YYYYB}-${MMB}-${DDB}"
+
+# ********** Directories **********
+
+input_dir="${input_dir_tpl//%%year%%/${YYYYB}}"
+input_dir="${input_dir//%%month%%/${MMB}}"
+input_dir="${input_dir//%%day%%/${DDB}}"
+
+data_dir="${data_dir_tpl//%%year%%/${YYYYB}}"
+data_dir="${data_dir//%%month%%/${MMB}}"
+data_dir="${data_dir//%%day%%/${DDB}}"
+
+# === The output_dir_csv is directly the directory shared by web-page. It is static
+output_dir_csv="${output_dir_csv_tpl//%%year%%/${YYYYB}}"
+output_dir_csv="${output_dir_csv//%%month%%/${MMB}}"
+output_dir_csv="${output_dir_csv//%%day%%/${DDB}}"
+
+#====================================================================================================
+
+if [[ ! -f "${tmp_root_dir}/${depths_tmp}" ]]; then
+
+    echo "\"${depths_tmp}\" depths file will be created right now."
+
+    declare -a shy_lev
+    
+    # the first one is imposed to 0 also if it isn't present in the shyfem initialization file
+    shy_lev[0]=0
+    
+    write_array=0
+    
+    while IFS=" " read  read_levels
+    do
+    
+        if [[ "${read_levels}" == '$levels'                     ]]; then write_array=1 ; continue ; fi
+        if [[ "${read_levels}" == '$end' && $write_array -eq 1  ]]; then write_array=0 ; break    ; fi
+    
+        if [[ "${write_array}" -eq 1 ]]; then  shy_lev+=( ${read_levels} ) ; fi
+    
+    done < "$( find  ${input_dir} -type f -name  ${info_file} )"
+    
+    if [[ "${#shy_lev[@]}" -lt 2 ]]; then echo "ERROR: SHYFEM depth levels not found. Let's check \"${info_file}.\""; fi 
+    
+    #========================== Calculation of real physical depth value ==========================
+    
+    declare -a shy_real_lev
+    
+    for (( k=0; k<=$(( ${#shy_lev[@]} - 2 )); k++ ))
+    do
+        depth_value=$( echo "scale=2 ; ( ${shy_lev[$k]} + ${shy_lev[$(( k + 1 ))]} ) / 2 " | bc )   # approximate to 2 decimal values
+        shy_real_lev+=( $( printf "%%g" $depth_value ) )                                            # "%g" is used to remove unecessary decimal 0. For example convert 0.50 into 0.5
+    done
+    
+    # This is the tmp file containing the real SHYFEM depth levels. It is necessary for a lot of plots. file_depths_tmp.txt
+    printf "%%s\n" "${shy_real_lev[@]}" > "${tmp_root_dir}/${depths_tmp}" 
+else
+    echo "\"${depths_tmp}\" depths file already exists."
+fi
+
+
+# ===================================================================================================
+
+if  [[  ! -d "${output_dir_csv}" ]]; then
+    echo  -e "\"output_dir_csv\": ${output_dir_csv} doesn't exists. It will be created right now."
+    mkdir -p "${output_dir_csv}" || { echo "It's not possible to create the \"${output_dir_csv}\" output directory."; ERROR; }
+else
+    echo  -e "\"output_dir_csv\": ${output_dir_csv} already exists."
+fi
+
+# ===================================================================================================
+
+# loop on physical quantities data to be edited and archived for a mid-long timelimit and for web sharing
+for var in ${var_csv[@]};
+do
+
+    csv_job="$( mktemp -u ${csv_edit_job_launch_tpl} )"
+
+    #================== Check ===================
+
+    case $var in
+        temp_2d)  initialization_file="${initialization_file_temp_2d}"
+                  input_file_tpl="${input_temp2d_file_tpl}"            ;;
+        temp_3d)  initialization_file="${initialization_file_temp_3d}" 
+                  input_file_tpl="${input_temp3d_file_tpl}"            ;;
+        salt_2d)  initialization_file="${initialization_file_salt_2d}" 
+                  input_file_tpl="${input_salt2d_file_tpl}"            ;;
+        salt_3d)  initialization_file="${initialization_file_salt_3d}" 
+                  input_file_tpl="${input_salt3d_file_tpl}"            ;;
+        velx_2d)  initialization_file="${initialization_file_velx_2d}" 
+                  input_file_tpl="${input_velx2d_file_tpl}"            ;;
+        velx_3d)  initialization_file="${initialization_file_velx_3d}" 
+                  input_file_tpl="${input_velx3d_file_tpl}"            ;;
+        vely_2d)  initialization_file="${initialization_file_vely_2d}" 
+                  input_file_tpl="${input_vely2d_file_tpl}"            ;;
+        vely_3d)  initialization_file="${initialization_file_vely_3d}" 
+                  input_file_tpl="${input_vely3d_file_tpl}"            ;;
+        speed_2d) initialization_file="${initialization_file_speed_2d}"
+                  input_file_tpl="${input_speed2d_file_tpl}"           ;;
+        speed_3d) initialization_file="${initialization_file_speed_3d}"
+                  input_file_tpl="${input_speed3d_file_tpl}"           ;;
+        dir_2d)   initialization_file="${initialization_file_dir_2d}"
+                  input_file_tpl="${input_dir2d_file_tpl}"             ;;
+        dir_3d)   initialization_file="${initialization_file_dir_3d}"  
+                  input_file_tpl="${input_dir3d_file_tpl}"             ;;
+        all_2d)   initialization_file="${initialization_file_all_2d}"     
+                  input_file_tpl="${input_all2d_file_tpl}"             ;;
+        zeta_2d)  initialization_file="${initialization_file_zeta_2d}" 
+                  input_file_tpl="${input_zeta2d_file_tpl}"            ;;
+        *)        echo "Physical quantity \"$var\" not available. Please check the 'var_csv' array in 'general.ini'.";;
+    esac
+
+    #============================================================
+    #                     START edit job BLOCK 
+    #============================================================
+
+    echo "\"$var\" ASCII csv files will be edited right now."
+
+    sed     -e "s,%%%%bulletin_date%%%%,${DATEB_label},g"                            \
+            -e "s,%%%%tmp_root_dir%%%%,${tmp_root_dir},g"                            \
+            -e "s,%%%%data_dir%%%%,${data_dir},g"                                    \
+            -e "s,%%%%conf_script_dir%%%%,${conf_script_dir},g"                      \
+            -e "s,%%%%output_dir%%%%,${output_dir_csv},g"                            \
+            -e "s/%%%%input_file_tpl%%%%/${input_file_tpl}/g"                        \
+            -e "s/%%%%output_file_csv_tpl%%%%/${output_file_csv_tpl}/g"              \
+            -e "s/%%%%nodes_info_file%%%%/${nodes_info_file}/g"                      \
+            -e "s/%%%%depths_tmp%%%%/${depths_tmp}/g"                                \
+            -e "s/%%%%queue_csv%%%%/${queue_csv}/g"                                  \
+            -e "s/%%%%wall_time_csv%%%%/${wall_time_csv}/g"                          \
+            -e "s/%%%%var%%%%/${var}/g"                                              \
+            -e "s/%%%%sep_csv%%%%/${sep_csv}/g"                                      \
+            -e "s/%%%%initialization_file%%%%/${initialization_file}/g"       "${script_root_dir}/${csv_edit_job_template}" > "${tmp_root_dir}/${csv_job}"
+
+    ecflow_qsub "${tmp_root_dir}/${csv_job}" || { echo "WARNING: The job-script: \"${csv_job}\" can't be launched."; continue; }
+      
+    echo -e "The csv file editing for \"$var\" are just finished according to \"${conf_script_dir}/${initialization_file}\"."
+    echo -e "You can find the results in \"${output_dir_csv}\".\n"
+
+    rm "${tmp_root_dir}/${csv_job}" || echo "WARNING: It's not possible to remove the job script: \"${csv_job}\"."
+
+#================================================
+
+done  # end of 'var_csv' cycle
+
+echo -e "\n\tThe task is now finished\n"
+
+EXIT_STATUS=$?
+echo -e "\n\tExecution completed with EXIT_STATUS=${EXIT_STATUS}\n\n"
+
+%include <tail_4_bash.h>               # Include tail common to all tasks. 
+                                       # It manages general calls to ecflow client

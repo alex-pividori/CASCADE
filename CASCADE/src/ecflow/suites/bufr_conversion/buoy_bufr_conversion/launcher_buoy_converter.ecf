@@ -1,0 +1,227 @@
+%manual
+%include <man/launcher_buoy_converter.man>
+%end
+
+%include <head_4_bash.h>       # Include header common to all tasks.
+                               # It manages general calls to ecflow client
+
+%include <etc/qsub_4_bash.h>
+%include <etc/general.ini>  
+
+# This ecflow task is used to manage the buoy raw data for BUFR format conversion
+
+#========================================================================
+#                        Buoy raw data conversion
+#========================================================================
+
+cd   $tmp_dir_root    && echo "Now I'm in \"$tmp_dir_root\" directory." || { echo -e "I can't change directory to \$tmp_dir_root: \"$tmp_dir_root\"" ; ERROR ; }
+day_range=$day_range   # day_range is the number of past days the task tries to convert: from yesterday to -$day_range days
+
+# The conversion process must starts at least two days ago (for technical data-recording reasons). The conversion process continue backwards until \$day_range days ago 
+# to convert potential data transmission dalays happened in past days. In case the n-th past day has already been converted, the cycle continues unchanged. 
+
+for day_shift in $( seq 2 $day_range ) 
+do
+
+# Useful set of dates needed for the converson process
+#================== Reference date ======================
+year=`        date -d "-${day_shift}day"          +"%%Y"`
+month=`       date -d "-${day_shift}day"          +"%%m"`
+day=`         date -d "-${day_shift}day"          +"%%d"`
+
+#=================== Date +1 day ========================
+year_p=`      date -d "$year-$month-$day  +1day"  +"%%Y"`
+month_p=`     date -d "$year-$month-$day  +1day"  +"%%m"`
+day_p=`       date -d "$year-$month-$day  +1day"  +"%%d"`
+
+#============= cortek Analysis date ( yesterday ) =======
+year_al=`     date -d "$year-$month-$day  -1day"  +"%%Y"`
+month_al=`    date -d "$year-$month-$day  -1day"  +"%%m"`
+day_al=`      date -d "$year-$month-$day  -1day"  +"%%d"`
+
+#== nke-wimo Analysis date ( the day before yesterday ) =
+year_al_n=`   date -d "$year-$month-$day  -2day"  +"%%Y"`
+month_al_n=`  date -d "$year-$month-$day  -2day"  +"%%m"`
+day_al_n=`    date -d "$year-$month-$day  -2day"  +"%%d"`
+
+#========== functional date for nke_wimo buoys ==========
+year_al_n1=`  date -d "$year-$month-$day  -3day"  +"%%Y"`
+month_al_n1=` date -d "$year-$month-$day  -3day"  +"%%m"`
+day_al_n1=`   date -d "$year-$month-$day  -3day"  +"%%d"`
+
+#========= Input and output Directories Paths ===========
+
+%include <etc/launcher_buoy_converter.ini>
+
+# Here the following dir paths has been created for:
+# /cortek_input_dir /nke_wimo_input_dir /cortek_output_dir /nke_wimo_output_dir
+
+#================= Input-dir check ======================
+
+if [[ ! -d $cortek_input_dir ]] || [[ ! -d $nke_wimo_input_dir ]]; then
+    echo -e "\n\tThe input data directory $cortek_input_dir and/or $nke_wimo_input_dir is/are not available. The buoy raw data doesn't exist."
+    continue
+else
+    echo -e "\n\tThe \"$cortek_input_dir\" and \"$nke_wimo_input_dir\" directories exist. If not already done, the bufr conversion will be launched."
+fi
+
+#================ Output-dir check ======================
+
+if [[ -d $cortek_output_dir ]] && [[    -d $nke_wimo_output_dir ]] && ls $cortek_output_dir/*.bufr 1> /dev/null 2>&1 && ls $nke_wimo_output_dir/*.bufr 1> /dev/null 2>&1 ; then
+# The line above checks the presence of the output directories and the eventual .bufr output files. If already present the conversion for that day has already been figured out.
+
+    echo -e "\n\tThe data conversion for \"$cortek_output_dir\" \"$nke_wimo_output_dir\" paths has already been performed."
+    continue
+else
+    echo -e "\n\tThe data conversion for \"$cortek_output_dir\" \"$nke_wimo_output_dir\" paths has not been performed yet. The bufr conversion is starting."
+fi
+
+#===================================================================
+#====================== Output dir creation ========================
+#===================================================================
+
+if [[ !  -d $cortek_output_dir   ]]; then
+   mkdir -p $cortek_output_dir   && echo "The directory \"$cortek_output_dir\" has been created"
+fi
+
+if [[ !  -d $nke_wimo_output_dir ]]; then
+   mkdir -p $nke_wimo_output_dir && echo "The directory \"$nke_wimo_output_dir\" has been created"
+fi
+
+#=====================================================================================================================================
+
+for b_type in ${buoy_types[@]}    # buoy_types array containing "cortek" and/or "nke_wimo" ex. buoy_types=( "cortek" "nke_wimo" )
+do
+
+case $b_type in 
+#============================
+#           Cortek
+#============================
+
+"cortek")
+
+    if [[ ! -d $cortek_input_dir ]]; then      # input-file directory check. This check is overloaded
+        echo -e "\tThe directory \"$cortek_input_dir\" for cortek buoys doesn't exist. These kind of buoy conversion won't be performed."
+        continue
+    fi
+
+#********************************************
+
+    for buoy in "RFVGCORON4"  "AFVGBARBAN"     # prefix buoy types
+    do
+        # This program puts only the files name (.mis) inside "list_files_cortek-wimo.txt". The arc dir path is included in the initialization file
+        echo -e "\tCreation of \"list_file_cortek.txt\" containing the data files that will be processed."
+
+        ls  $cortek_input_dir | grep -e "${buoy}_${year_al}${month_al}${day_al}..........mis" \
+                                     -e "${buoy}_${year_al_n}${month_al_n}${day_al_n}..........mis" | sort  >  temp_list_file_cortek.txt  || \
+                                     { echo "Something has gone wrong in the \"list_file_cortek.txt\" creation"; exit; }
+
+        ls  $cortek_path_p    | grep -e "${buoy}_${year}${month}${day}..........mis" | sort  >>  temp_list_file_cortek.txt  || \
+                                     { echo "Something has gone wrong in the \"list_file_cortek.txt\" creation"; exit; }
+    
+        cat temp_list_file_cortek.txt | sort  > list_file_cortek.txt 
+   
+        if [[ $( wc -l list_file_cortek.txt | tr -d [:alpha:] | tr -d "_. " ) -eq 0 ]]; then echo "There is no data for cortek $buoy in ${year_al}-${month_al}-${day_al}"; continue; fi
+
+        bbb=`find $cortek_input_dir $cortek_path_p  | grep -e ${buoy}_${year_al}${month_al}${day_al}..........mis  \
+                                                           -e ${buoy}_${year_al_n}${month_al_n}${day_al_n}..........mis \
+                                                           -e ${buoy}_${year}${month}${day}..........mis  | sort`
+        list_files=( $bbb )
+       
+        cat ${list_files[@]}  > cortek_data_row.txt        # Unique file containing raw buoy data
+
+        if [[ $( wc -l list_file_cortek.txt | tr -d [:alpha:] | tr -d "_. " ) -gt 0 ]]; then 
+   
+            sed -e s/%%%%tmp_dir_root%%%%/${tmp_dir_root//\//\\/}/g     \
+                -e s/%%%%input_dir%%%%/${cortek_input_dir//\//\\/}/g    \
+                -e s/%%%%output_dir%%%%/${cortek_output_dir//\//\\/}/g  \
+                -e s/%%%%b_type%%%%/${b_type}/g                         \
+                -e s/%%%%buoy%%%%/${buoy}/g                             \
+                -e s/%%%%python_module%%%%/${python_module//\//\\/}/g   \
+                -e s/%%%%eccodes_module%%%%/${eccodes_module//\//\\/}/g        converter_buoy_template.job   >   converter_buoy.job
+
+            echo   "The \"converter_buoy.job\" for cortek in ${buoy} buoy, will be launched right now."
+            ecflow_qsub   converter_buoy.job 
+            echo   "The \"converter_buoy.job\" for \"$buoy\" cortek buoy has finished"
+
+            rm  temp_list_file_cortek.txt  list_file_cortek.txt    cortek_data_row.txt   converter_buoy.job 
+            echo -e "\tcortek buoy conversion for \"$buoy\" buoy has been correctly completed"
+        else
+            echo "The cortek buoy:\"$buoy\" has not been found for ${year_al}-${month_al}-${day_al} date"
+        fi
+
+        unset list_files
+
+    done
+;;
+
+#============================
+#          nke_wimo
+#============================
+
+"nke_wimo")
+    
+    if [[ ! -d $nke_wimo_input_dir ]]; then    # input-file directory check.  This check is overloaded
+        echo -e "\tThe directory $nke_wimo_input_dir for nke-wimo buoys doesn't exist. These kind of buoy conversion won't be performed."
+        continue
+    fi
+
+#******************************************
+
+    for buoy in "5228" "5229" "522f"     # prefix buoy types
+    do
+    # This program puts only the files name (.csv) inside "list_files_nke-wimo.txt". The arc dir path is included in the initialization file
+        echo -e "\tCreation of \"list_file_nke_wimo.txt\" containing files for buoy: $buoy and date: ${year_al_n}-${month_al_n}-${day_al_n}."
+
+        ls $nke_wimo_input_dir | grep -e "${buoy}_data_${year_al_n:2:2}${month_al_n}${day_al_n}_.......csv" \
+                                      -e "${buoy}_data_${year_al_n1:2:2}${month_al_n1}${day_al_n1}_.......csv"  | sort  >  list_file_nke_wimo.txt  || \
+                                      { echo "Something has gone wrong in the \"list_file_nke_wimo.txt\" creation"; exit; }
+     
+        if [[ $( wc -l list_file_nke_wimo.txt | tr -d [:alpha:] | tr -d "_. " ) -eq 0 ]]; then echo "There is no data for $buoy in ${year_al_n}-${month_al_n}-${day_al_n}"; continue; fi
+      
+        aaa=`find $nke_wimo_input_dir | grep -e ${buoy}_data_${year_al_n:2:2}${month_al_n}${day_al_n}_.......csv \
+                                             -e ${buoy}_data_${year_al_n1:2:2}${month_al_n1}${day_al_n1}_.......csv | sort` 
+        list_files=( $aaa )
+
+        cat ${list_files[@]} | grep "${year_al_n}-${month_al_n}-${day_al_n} [0-9][0-9]" | sort > nke_data_row.txt  
+    
+        if [[ $( wc -l nke_data_row.txt | tr -d [:alpha:] | tr -d "_. " )  -gt 0 ]]; then     # more than 0 file
+           
+            sed -e s/%%%%tmp_dir_root%%%%/${tmp_dir_root//\//\\/}/g       \
+                -e s/%%%%input_dir%%%%/${nke_wimo_input_dir//\//\\/}/g    \
+                -e s/%%%%output_dir%%%%/${nke_wimo_output_dir//\//\\/}/g  \
+                -e s/%%%%b_type%%%%/${b_type}/g                           \
+                -e s/%%%%buoy%%%%/${buoy}/g                               \
+                -e s/%%%%python_module%%%%/${python_module//\//\\/}/g     \
+                -e s/%%%%eccodes_module%%%%/${eccodes_module//\//\\/}/g        converter_buoy_template.job   >   converter_buoy.job
+
+            echo "The \"converter_buoy.job\" for nke_wimo in ${buoy} buoy, will be launched right now."
+            ecflow_qsub   converter_buoy.job
+            echo "The \"converter_buoy.job\" for \"$buoy\" has just finished"
+
+            rm list_file_nke_wimo.txt nke_data_row.txt converter_buoy.job ;  echo -e "\tnke_wimo buoy conversion for \"$buoy\" buoy has been correctly completed"; 
+        else
+            echo "The nke-wimo buoy:\"$buoy\" has not been found for ${year_al_n}-${month_al_n}-${day_al_n} date"
+        fi
+
+        unset list_files
+
+    done
+;;
+
+#========= else ==========
+
+*)
+    echo -e "\n\tBuoy type not supported in ${buoy_types[@]}. Plese insert "nke_wimo" or "cortek".\n"
+;;
+
+esac
+
+echo -e "\tThe data conversion from miss/csv to BUFR is finished for: ${year_al}/${year_al}${month_al}${day_al} cortek-buoy and \
+            ${year_al_n}/${year_al_n}${month_al_n}${day_al_n} for nke_wimo buoy."
+
+done # buoy types end-cycle
+
+done # end of back-days cycle 
+
+%include <tail_4_bash.h>   

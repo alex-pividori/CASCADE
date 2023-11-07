@@ -1,0 +1,9 @@
+#=========================================================================
+#                    't_shyfem_ps2gif.man' task manual
+#=========================================================================
+
+This "ecFlow" task is aimed at running a job script, which creates a
+customized GIF, from a PostScript obtained through the "shyplot" SHYFEM's
+tool, applied to a SHY (.shy) file for a given time interval, variable
+and vertical layer, and according to a parameter STR file for post
+processing routines.

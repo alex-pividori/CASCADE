@@ -1,0 +1,126 @@
+# ******************************************************************************
+#                                    TASK
+#                   To be used in the frame of "ecFlow" suites
+#            (https://confluence.ecmwf.int/display/ECFLOW/ecflow+home)
+# ******************************************************************************
+#
+#  DESCRIPTION:    this "ecFlow" task is aimed at downloading hydrological
+#                  data (rivers), from the ERDDAP data server of the "Centro
+#                  Euro-Mediterraneo sui Cambiamenti Climatici" (CMCC).
+#
+#  EXTERNAL CALLS: none.
+#
+#  EXTERNAL FILES: - header managing general calls to "ecFlow" client;
+#                  - suite's initialisation file;
+#                  - tail managing general calls to "ecFlow" client.
+#
+#  DEVELOPER:      Alessandro Minigher (alessandro.minigher@arpa.fvg.it)
+#                  ARPA FVG - S.O.C. Osmer e GRN - S.O.S. Qualità dell'aria
+#
+#  CREATION DATE:  2022-11-11.
+#
+#  MODIFICATIONS:  none.
+#
+#  VERSION:        0.1.
+#
+# ******************************************************************************
+
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+# Suite's initialisation file
+%include <etc/ERDDAP_download.ini>
+
+#  --- START OF FUNCTIONS ---
+
+# Get the session ID
+get_session_id () {
+
+    curl -c- -s \
+         "${ERDDAP_HOST_HTTP}/login.html" \
+         -X POST \
+         -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8' \
+         -H 'Accept-Language: en,it;q=0.7,en-US;q=0.3' \
+         -H 'Accept-Encoding: gzip, deflate, br' \
+         -H 'Content-Type: application/x-www-form-urlencoded' \
+         -H 'Connection: keep-alive' \
+         -H 'Cookie: JSESSIONID=ADEDA906F1BD6625567B160EBA98ADED' \
+         -H 'Upgrade-Insecure-Requests: 1' \
+         -H 'Sec-Fetch-Dest: document' \
+         -H 'Sec-Fetch-Mode: navigate' \
+         -H 'Sec-Fetch-Site: same-origin' \
+         -H 'Sec-Fetch-User: ?1' \
+         -H 'Pragma: no-cache' \
+         -H 'Cache-Control: no-cache' \
+         --data "user=${ERDDAP_USERNAME}&password=${ERDDAP_PASSWORD}" \
+         | grep "JSESSIONID" | cut -f7
+
+}
+
+# Download the desired file (the session ID is provided as first input
+# argument) from the given URL (second input argument) and provide it the given
+# name (third input argument)
+download_file () {
+
+    # Get the following information as input arguments of the function:
+    #  - session ID (first input argument)
+    local j_session_id="$1"
+    #  - URL (second input argument)
+    local url="$2"
+    #  - output file's name (third input argument)
+    local f_out="$3"
+
+    wget --no-parent -r --level=inf -nv \
+         --no-check-certificate \
+         -e robots=off \
+         --header='Connection: keep-alive' \
+         --header="Cookie: JSESSIONID=${j_session_id}" \
+         --header='Upgrade-Insecure-Requests: 1' \
+         --header='Sec-Fetch-Dest: document' \
+         --header='Sec-Fetch-Mode: navigate' \
+         --header='Sec-Fetch-Site: same-origin' \
+         --header='Sec-Fetch-User: ?1' \
+         --header='Pragma: no-cache' \
+         --header='Cache-Control: no-cache' \
+         "${url}" -O $f_out
+
+}
+
+#  --- END OF FUNCTIONS ---
+
+#  --- START OF MAIN ---
+
+# Inform the user about the current directory
+echo -e "\tCurrent directory: $(pwd).\n"
+
+# Create the desired temporary (working) directory, if not existent, move into
+# it and inform the user
+if [[ ! -d "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}" ]]; then mkdir -p "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}"; fi
+echo -e "\tChange directory: moving to ${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}..."; cd "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}"
+echo -e "\tCurrent directory: $(pwd).\n"
+
+# Define the URL of the product to download
+URL="${ERDDAP_URL['%VAR%']}"
+# Define the basename of the downloaded file (template)
+F_OUT="${ERDDAP_OUT_FILE['%VAR%']}"
+
+# For each river/basin to download
+for RIVER_ID in ${RIVER_IDS[@]}; do
+
+    # Get the name of the river/basin
+    RIVER="${RIVERS[$RIVER_ID]}"
+    # Define the URL of the specific product to download
+    ERDDAP_URL="${URL//%%RIVER_ID%%/$RIVER_ID}"
+    # Define the basename of the specific downloaded file, starting from its
+    # template
+    ERDDAP_OUT_FILE="${F_OUT//%%RIVER%%/$RIVER}"
+    # Function calling: download the desired file (the session ID is provided
+    # as first input argument) from the given URL (second input argument) and
+    # provide it the given name (third input argument)
+    download_file "$(get_session_id)" "$ERDDAP_URL" "$ERDDAP_OUT_FILE" || ERROR
+
+done
+
+#  --- END OF MAIN ---
+
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

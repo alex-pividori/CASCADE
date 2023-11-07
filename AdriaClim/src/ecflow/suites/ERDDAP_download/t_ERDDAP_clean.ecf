@@ -1,0 +1,59 @@
+# ******************************************************************************
+#                                    TASK
+#                   To be used in the frame of "ecFlow" suites
+#            (https://confluence.ecmwf.int/display/ECFLOW/ecflow+home)
+# ******************************************************************************
+#
+#  DESCRIPTION:    this "ecFlow" task is aimed at deleting all the desired
+#                  files or directories.
+#
+#  EXTERNAL CALLS: none.
+#
+#  EXTERNAL FILES: - header managing general calls to "ecFlow" client;
+#                  - suite's initialisation file
+#                  - files (or directories) to be deleted;
+#                  - tail managing general calls to "ecFlow" client.
+#
+#  DEVELOPER:      Alessandro Minigher (alessandro.minigher@arpa.fvg.it)
+#                  ARPA FVG - S.O.C. Osmer e GRN - S.O.S. Qualità dell'aria
+#
+#  CREATION DATE:  2022-11-11.
+#
+#  MODIFICATIONS:  none.
+#
+#  VERSION:        0.1.
+#
+# ******************************************************************************
+
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+# Suite's initialisation file
+%include <etc/ERDDAP_download.ini>
+
+#  --- START OF FUNCTIONS ---
+
+# Remove the given file or directory, if existent
+rm_filedir () {
+    # If the file or directory provided to the function exists
+    if [[ -e $1 ]]; then
+        # Remove it and inform the user
+        rm -r $1; echo -e "\tFile/directory: $1 removed.\n"
+    fi
+}
+
+#  --- END OF FUNCTIONS ---
+
+# Inform the user about the current directory
+echo -e "\tCurrent directory: $(pwd).\n"
+
+# Create the desired temporary (working) directory, if not existent, move into
+# it and inform the user
+if [[ ! -d "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}" ]]; then mkdir -p "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}"; fi
+echo -e "\tChange directory: moving to ${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}..."; cd "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}"
+echo -e "\tCurrent directory: $(pwd).\n"
+
+# Function calling: remove the given files or directories, if existent
+rm_filedir "${SCRATCH_ERDDAP_DOWNLOAD_DIR_TMP['%VAR%']}"
+
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

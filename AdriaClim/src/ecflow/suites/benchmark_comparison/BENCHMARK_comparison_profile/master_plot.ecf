@@ -1,0 +1,29 @@
+%manual
+%include <man/set_dir.man>
+%end
+
+%include <head_4_bash.h>                                # Include head common to all tasks.
+                                                        # It manages general calls to ecflow client
+
+%include <qsub_4_bash.h>
+%include <etc/general.ini>
+
+#===========================================================================================
+
+GOON=0
+
+cd $working_dir || GOON=1
+stat_index="$stat_index"
+
+initialization_file_profile="$init_file_dir/initialization_file_profile.txt"
+
+sed     -e s/%%%%miniconda_module%%%%/${miniconda_module//\//\\/}/g          \
+        -e s/%%%%init_file%%%%/${initialization_file_profile//\//\\/}/g      \
+        -e s/%%%%stat_index%%%%/${stat_index}/g                              \
+        -e s/%%%%tmp_dir_root%%%%/${working_dir//\//\\/}/g     profile_master_plot_thrower_template.job    >   profile_master_plot_thrower.job 
+
+
+	        qsub profile_master_plot_thrower.job  || echo "Something has gone wrong in the \"benchmark_comparison_master_plot_thrower.job\" script run"
+
+%include <tail_4_bash.h>               # Include tail common to all tasks.
+                                       # It manages general calls to ecflow client

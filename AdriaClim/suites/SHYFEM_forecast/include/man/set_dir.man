@@ -1,0 +1,11 @@
+#=======================================================================================
+#                                        'set_dir' manual 
+#=======================================================================================
+
+This task is used to create the working directory for the 'SHYFEM_forecast' suite. 
+The path of this directory in included in the 'general.ini' initialization file under
+the string variable 'tmp_root_dir' and can be modified as you prefer. 
+
+If the working direactory already exists, it will be removed and recreated. 
+A bunch of checks for the creation and possible remotion of the 'tmp_root_dir' dir
+are included inside the task. 

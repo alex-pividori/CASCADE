@@ -1,0 +1,154 @@
+#!/bin/bash
+
+# ******************************************************************************
+#
+#  DESCRIPTION:      This bash job script is used to edit the csv output SHYFEM
+#                    forecast files. After the editing process, a dedicated task
+#                    transfer the files into a remote directory for the sharing
+#                    process via an html public web-page.               
+#
+#  EXTERNAL CALLS:   - None
+#
+#  EXTERNAL FILES:   - None
+#    
+#
+#  DEVELOPER:        Alex Pividori (alex.pividori@arpa.fvg.it)
+#                    ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#
+#  CREATION DATE:    20/06/2023
+#
+#  MODIFICATIONS:    20/06/2023 --> Job creation
+#                    21/06/2023 --> The job has been completed                     
+#
+#  VERSION:          0.1.
+#
+# ******************************************************************************
+
+#PBS -N SHYFEM_edit_csv
+#PBS -o stdout_csv
+#PBS -e stderr_csv
+#PBS -W umask=0002
+#PBS -q %%queue_csv%%
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=%%wall_time_csv%%
+#PBS -W block=true
+
+# ========= Variables ==========
+var="%%var%%"
+bulletin_date="%%bulletin_date%%"
+sep_csv="%%sep_csv%%"
+
+# ========== Files =============
+initialization_file="%%initialization_file%%"
+input_file_tpl="%%input_file_tpl%%"
+output_file_csv_tpl="%%output_file_csv_tpl%%"
+nodes_info_file="%%nodes_info_file%%"
+depths_tmp="%%depths_tmp%%"
+
+# ======== Directories =========
+tmp_root_dir="%%tmp_root_dir%%"
+data_dir="%%data_dir%%"
+output_dir="%%output_dir%%"
+conf_script_dir="%%conf_script_dir%%"
+
+# ============================== Start operative job ==============================
+
+cd $tmp_root_dir  || { echo "ERROR: I can't move to \"$tmp_root_dir\"."; ERROR; }
+
+#====================================================================================================
+
+declare -A ph_qt=( [temp_2d]="Temperature vertical mean[°C]"          [temp_3d]="Temperature [°C]"                            [salt_2d]="Salinity vertical mean [PSU]"        \
+                   [salt_3d]="Salinity [PSU]"                         [velx_2d]="Eastward velocity vertical mean [m/s]"       [velx_3d]="Eastward velocity [m/s]"             \
+                   [vely_2d]="Northward velocity vertical mean [m/s]" [vely_3d]="Northward velocity [m/s]"                    [speed_2d]="Water speed vertical mean [m/s]"    \
+                   [speed_3d]="Water Speed [m/s]"                     [dir_2d]="Water current direction vertical mean [deg]"  [dir_3d]="Water current direction [deg]"        \
+                   [all_2d]="Sea surface height WGS 84 (EPSG:4326) [m], Eastward velocity vertical mean [m/s], Northward velocity vertical mean [m/s], Water speed vertical mean [m/s], \
+Water current direction vertical mean [deg]"                          [zeta_2d]="Sea surface height WGS 84 (EPSG:4326) [m]" )
+
+# === Array for real depths SHYFEM levels ===
+if [[ -f "${tmp_root_dir}/${depths_tmp}" ]]; then  levels_real=( $( cat "${tmp_root_dir}/${depths_tmp}"  | tr "\n" " " ) ); 
+                                             else  echo "ERROR: ${tmp_root_dir}/${depths_tmp} file doesn't exist"; exit;
+                                             fi
+
+i=1
+while read -r node_label 
+do
+
+    if [[ -z "$node_label" ]]; then
+        echo "WARNING: node: $node_label is not inserted at line $i of \"${initialization_file}\" initialization file."
+        (( i++ )); continue;
+    fi
+
+    # remove leading and trailing blank spaces
+    node_label="$( sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${node_label}" )"
+
+    echo -e "\nThe node at line $i for $var physical quantity is: ${node_label}"
+
+    declare -a info_node
+
+    # i  node(shy idx)  il   hdep  lon  lat  node_label
+    info_node=(  $( grep --max-count=1  ${node_label}  "${data_dir}/${nodes_info_file}" )  )
+
+    # node check
+    if [[ ${#info_node[@]} -eq 0 ]]; then echo "WARNING: ${node_label} node inserted at line $i of \"${initialization_file}\" doesn't exist."; (( i++ )); continue; fi
+
+    n_levels="${info_node[2]}"
+
+    # === Files declaration ===
+    header_file_tmp="$( mktemp -u   header_file_XXXX.txt )"
+    input_file="${input_file_tpl//%node_idx%/${info_node[0]}}" 
+    input_file_tmp="$(  mktemp -u ${input_file}_XXXX.txt )"
+    output_file="${output_file_csv_tpl//%input_file_csv_tpl%/${input_file}}"
+
+    if [[ ! -s "${data_dir}/${input_file}" ]]; then echo "The data file \"${data_dir}/${input_file}\" doesn't exist or is empty. Continue to the next cycle."; (( i++ )); continue; fi
+
+    time_b_raw="$( egrep --max-count=1  "[0-9][0-9][0-9][0-9]-[01][0-9]-[0-3][0-9]::"  "${data_dir}/${input_file}" )"
+    time_b="${time_b_raw:12:8}"; unset time_b_raw
+
+    # === Columns names ===
+    if   [[ ! "${var}" =~ "2d" ]]; then
+        col_names="DateTime [UTC]      $( printf '; %s m' ${levels_real[@]::${info_node[2]}} )"
+    else
+        col_names="DateTime [UTC];     ${ph_qt[${var}]}"
+    fi
+
+cat << EOF > "${tmp_root_dir}/${header_file_tmp}"
+#
+# Node:            ${node_label}
+# latitude:        ${info_node[5]} °N
+# longitude:       ${info_node[4]} °E
+# Bathymetry:      ${info_node[3]} m compared to WGS 84 (EPSG:4326)
+# Forecast SHYFEM: ${bulletin_date} ${time_b} UTC (bulletin date)
+# Domain:          F1; FVG marine area; Over Trieste Gulf and Marano-Grado Lagoon
+# Physical quantity: ${ph_qt[${var}]}
+#
+$col_names
+EOF
+
+    OKKO=0
+    # === Edited csv file creation ===
+
+    if   [[ ! "${var}" =~ "2d" ]]; then
+        sed -r "s/[[:space:]]+/${sep_csv}/g" "${data_dir}/${input_file}"              > "${tmp_root_dir}/${input_file_tmp}" || OKKO=1
+        cat "${tmp_root_dir}/${header_file_tmp}" "${tmp_root_dir}/${input_file_tmp}"  > "${output_dir}/${output_file}"      || OKKO=1
+    else
+        sed -r "s/[[:space:]]+/${sep_csv}/g" "${data_dir}/${input_file}" | tail -n +2 > "${tmp_root_dir}/${input_file_tmp}" || OKKO=1
+        cat "${tmp_root_dir}/${header_file_tmp}" "${tmp_root_dir}/${input_file_tmp}"  > "${output_dir}/${output_file}"      || OKKO=1
+    fi
+
+    # === File creation check ===
+    if [[ $OKKO -eq 0 ]]; then
+        echo "The csv file \"${output_dir}/${output_file}\" has been correctly created."
+    else
+        echo "WARNING: Something has gone wrong during the \"${output_dir}/${output_file}\" csv file creation."
+    fi
+
+    # === Remotion of temporary files ===
+    rm "${tmp_root_dir}/${header_file_tmp}" "${tmp_root_dir}/${input_file_tmp}"  \
+       ||  echo "Warning: Something has gone wrong during the remotion of \"${tmp_root_dir}/${header_file_tmp}\" file and/or \"${output_dir}/${input_file_tmp}\" file."
+
+  
+    (( i++ ))
+    unset info_node
+
+done < "${conf_script_dir}/${initialization_file}"
+

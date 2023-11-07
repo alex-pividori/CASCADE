@@ -1,0 +1,87 @@
+# ******************************************************************************
+#                                    TASK
+#                   To be used in the frame of "ecFlow" suites
+#            (https://confluence.ecmwf.int/display/ECFLOW/ecflow+home)
+# ******************************************************************************
+#
+#  DESCRIPTION:    this "ecFlow" task is aimed at setting the desired year in
+#                  the time series contained in a set of splitted/unpacked EXT
+#                  files.
+#
+#  EXTERNAL CALLS: none.
+#
+#  EXTERNAL FILES: - header managing general calls to "ecFlow" client;
+#                  - suite initialisation file, specific for a certain
+#                    simulation;
+#                  - tail managing general calls to "ecFlow" client.
+#
+#  DEVELOPER:      Alessandro Minigher (alessandro.minigher@arpa.fvg.it)
+#                  ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#                  "AdriaClim" Interreg IT-HR project
+#
+#  CREATION DATE:  2022-03-30.
+#
+#  MODIFICATIONS:  none.
+#
+#  VERSION:        0.1.
+#
+# ******************************************************************************
+
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head.h>
+# Include a specific initialisation file, peculiar to the given simulation
+# (e.g. "1995F500D0_A001.ini" for simulation "1995F500D0_A001"). The basename
+# (extension excluded) of this initialisation file is provided by a family
+# variable
+%include <etc/%SIM%.ini>
+
+# **********************
+#  START OF MAIN SCRIPT
+# **********************
+
+# If the not perturbed run is going to be considered, then exit (time shift is
+# not needed)
+if [[ -z $PROJ_YEAR_2_SET ]]; then exit 0; fi
+
+# Define the default status for the "sed" operation (OKKO=0 -> all went OK,
+# OKKO=1 -> something went KO)
+OKKO=0
+
+# Inform the user about the current directory
+echo -e "\n\tCurrent directory: $(pwd).\n"
+
+# Change directory and inform the user
+echo -e "\tChange directory: moving to ${SCRATCH_SIM_ID_EXT_DIR}..."; cd $SCRATCH_SIM_ID_EXT_DIR
+echo -e "\tCurrent directory: $(pwd).\n"
+
+# Get the ending year of the actual time period to simulate
+IFS='-' read -ra array <<< "${SHY_ITEND}"
+YEAR_2_REPLACE="${array[0]}"
+
+# For each file in the current directory (i.e. for each splitted/unpacked EXT
+# file)
+for f in $(ls); do
+
+    # Set the desired year in the time series contained in the current
+    # splitted/unpacked EXT files
+    sed -i "s/${YEAR_2_REPLACE}-/${PROJ_YEAR_2_SET}-/g" $f || OKKO=1
+
+    # Check the outcome of the "sed" operation:
+    #  - if all went OK
+    if [[ $OKKO -eq 0 ]]; then
+        # Inform the user
+        echo -e "\tFile: ${f} successfully shifted in time."
+    #  - if something went KO
+    else
+        # Inform the user and abort
+        echo -e "\tERROR! File: ${f} unsuccessfully shifted in time. ABORT...\n"; ERROR
+    fi
+
+done
+
+# ********************
+#  END OF MAIN SCRIPT
+# ********************
+
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail.h>

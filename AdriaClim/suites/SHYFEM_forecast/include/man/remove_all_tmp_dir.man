@@ -1,0 +1,15 @@
+#==========================================================================
+#                This is the manual of 'remove_dir' task
+#==========================================================================
+
+The 'remove_all_tmp_dir.ecf' task is inserted at the end of the flow and it is used to
+delete the temporary working directory created inside the scratch to manage 
+scripts, initialization files, job_summary, stdout, stderr  and everithing
+has automatically been created by the working scripts.
+
+The working directory is indicated inside the 'general.ini' initialization file
+under the string variable '\$tmp_root_dir'. 
+
+This task is not indispensable because in the case of not remotion of the general 
+working directory, it will be removed by the 'set_dir.ecf' task the next launch
+of the suite (the following day).

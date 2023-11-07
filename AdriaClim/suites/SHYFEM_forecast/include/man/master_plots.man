@@ -1,0 +1,80 @@
+#===================================================================================
+#                                'master_plots' MANUAL              
+#===================================================================================
+
+'master_plots' is the main task of the 'SHYFEM_forecast' suite. It is used to manage 
+the job 'shyfem_forecast_graphs_template.job' used to create the plots by the single
+graphical scripts writed in Python or NCL. 
+
+The shyfem depths are calculated at the beginning of the task and saved in a unique file 
+called 'file_depths_tmp.txt'. This file is essentiale for the following graphs creation.
+
+The depth levels are read inside the '\$info_file': an ascii file contained in every 
+daily shyfem simulation in which you can find a lot of essential informations about 
+the simulation performed. 
+
+A bash 'case' is used to set the initialization file to use, the module to load and 
+the script to launch according to the "PLOT_TYPE" ecflow variable. All these file and
+variable names are included in the 'general.ini' file in include/etc directory.
+
+The philosophy of this task is to cycle between the first forecast simulation day "\$frst_day"
+and the last day '\$last_day'. For each day, a new 'shyfem_forecast_graphs_template.job' job 
+is created, personalised and launched. The "\$frst_day" and '\$last_day' variable are included in 
+'general.ini' and can be modified from 0 to 4 (currently there are 5 days of simulation).
+
+There are a lot of personalizing variables that are defined in master_plots and 
+inserted in the job file by a sed command. The job 'shyfem_forecast_graphs.job' calls
+the scripts used to created the graphs and a particular one 'encoding_file_name.sh'
+used to codify the file name.
+
+The codification follows the following rules:
+
+This is the format of the name: L-XXXXX_V-XXXXX_T-XXXXX_E-XXXXX.ext
+
+'X'   represent a generica 36-base character. From 0 to 9 and from A to Z (uppercase).
+'ext' indicate the extension of the file (png or gif in our case).
+
+The expressed letters represent the field:
+
+L:   local/spatial field
+V:   Variable field. this fiels containse a reference fot the physical quantities involved in the 
+     file creation.
+T:   Time field. This field contains temporal references.
+E:   Extra-field. This is a jolly field that can contain whatever you want. 
+
+In our particular application for 'SHYFEM_forecast' suite, the standard user is:
+
+d1_L: First digit of L-field. This character indicate the topological description of the 
+      plot realisation. For example: 0 is used for a single point, 1 for a 1-dimensional region, 
+      a vertical multiple point (line) plot. For the others values, please look at the 
+      'L_table_AXXXX.ini' table. 
+
+d2_L: Gives additional topological characteristics. The table involved depends on the first character.
+      These tables are: L_table_1AXXX.ini, L_table_4AXXX.ini
+
+d345_L: Are the last 3 characters of L-field. They give the most precise spatial description 
+        of the graph realization. For example, for a single lat/lon point, the last three alphanumeric
+        characters describes the exact point reference. The tables are: L_table_1XAAA.ini, L_table_4XAAA.ini 
+        (so far).
+
+================================================================================
+
+d12345_V:   The entire five digit set indicate by the 'V_table_AAAAA.ini' table the physical
+            quantities involved in the plot. For examples 0 is for temperature only etc etc.
+
+================================================================================
+
+d12345_T:   This field indicate the initial time-step of the plot representation starting from
+            the bulletin date-time. The starting time is indicated in minutes. 
+
+================================================================================
+
+d1_E:       This digit is reserved to indicate the plot-type. To decode the meaning
+            let's check the 'E_table_AXXXX.ini' table.
+
+d2_E:       Right now this digit is not used. It is set to 0 value.
+
+d345_E:     This last three digits indicates the duration (in minutes) of the 
+            graph representation. For many instantly plots (e.g. TS-diagrams)
+            this three digits are 000.
+

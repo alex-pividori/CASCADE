@@ -1,0 +1,105 @@
+#!/bin/bash
+
+# ******************************************************************************
+#
+#  DESCRIPTION:    this job script is aimed at running the Bash script that is
+#                  briefly described in the EXTERNAL CALLS comment section.
+#
+#  EXTERNAL CALLS: - Bash script aimed at processing a NetCDF file containing
+#                    precipitations [mm day-1] (see the EXTERNAL FILES comment
+#                    section), by summimng - for each month - an addend to the
+#                    data, according to a given distribution (the distribution
+#                    is provided through an histogram, which is month-specific;
+#                    monthly histograms share the same bins; for each bin, a
+#                    month- and bin- specific addend is provided). "Deltas"
+#                    (addends) are retrieved in an ASCII file (see the
+#                    EXTERNAL FILES comment section).
+#
+#  EXTERNAL FILES: - NetCDF file, resulting from a run of the WRF model
+#                    (implemented at CRMA - ARPA FVG), containing hourly
+#                    precipitations (PREC_ACC_NC), but expressed in mm day-1
+#                  - ASCII file containing, arranged line by line - the full
+#                    paths of the "deltas" files (see the description below):
+#
+#                    deltas_file_1
+#                    deltas_file_2
+#                    ...
+#                    deltas_file_N
+#
+#                    "Deltas" files are ASCII files in CSV format (.csv),
+#                    containing "deltas"; these files are formatted as shown
+#                    below:
+#
+#                    # Some lines of metadata
+#                    # month;bin-range [mm day-1];delta [mm day-1]
+#                    month_01;bin-range_1 [mm day-1]; delta_01_1 [mm day-1]
+#                    month_01;bin-range_2 [mm day-1]; delta_01_2 [mm day-1]
+#                    ...
+#                    month_02;bin-range_1 [mm day-1]; delta_02_1 [mm day-1]
+#                    month_02;bin-range_2 [mm day-1]; delta_02_2 [mm day-1]
+#                    ...
+#                    ...
+#                    month_12;bin-range_1 [mm day-1]; delta_12_1 [mm day-1]
+#                    month_12;bin-range_2 [mm day-1]; delta_12_2 [mm day-1]
+#                    ...
+#
+#  DEVELOPER:      Alessandro Minigher (alessandro.minigher@arpa.fvg.it)
+#                  ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#                  "AdriaClim" Interreg IT-HR project
+#
+#  CREATION DATE:  2022-03-31.
+#
+#  MODIFICATIONS:  none.
+#
+#  VERSION:        0.1.
+#
+# ******************************************************************************
+
+# ******************
+#  JOB'S DIRECTIVES
+# ******************
+
+#PBS -P AdriaClim
+#PBS -W umask=0002
+#PBS -N pert_rain
+#PBS -o pert_rain_stdout
+#PBS -e pert_rain_stderr
+#PBS -q arpa
+#PBS -l nodes=1:ppn=1
+#PBS -J 1-21
+#PBS -j oe
+#PBS -l walltime=06:00:00
+
+# ************
+#  ACTUAL JOB
+# ************
+
+#
+
+# Move to the directory where the job was run
+cd $PBS_O_WORKDIR
+
+# Define the name (full path) of the NetCDF file containing precipitations
+#file2proc="/lustre/arpa/AdriaClim/data/shyfem_inputs/WRF_CRMA/AlpeAdria/20170901-20180101/rain_WRF-CRMA_AlpeAdria_2017090100-2018010100.nc"
+file2proc="/lustre/arpa/AdriaClim/data/shyfem_inputs/WRF_CRMA/AlpeAdria/20171101-20190102/rain_WRF-CRMA_AlpeAdria_2017110100-2019010223.nc"
+
+# Define the name of the initialisation file containing the list of "deltas"
+# files
+ini_file="/lustre/arpa/scratch/AdriaClim/DELTAS/pr_delta.ini"
+
+# Define the name of the Bash script to run
+script2run="/lustre/arpa/scratch/AdriaClim/DELTAS/rain_perturbation_by_month_and_histogram.sh"
+
+# Define a line index
+i=0
+
+# For each line in the initialisation file (i.e. for each "deltas" file)
+while read delta_f; do
+
+    # Increase the line index by one unit
+    i=$(($i+1))
+
+    # If the job array's ID is equal to the line index, then run the Bash script
+    if [[ $PBS_ARRAY_INDEX -eq $i ]]; then source $script2run $file2proc $delta_f; fi
+
+done < $ini_file

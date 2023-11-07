@@ -1,0 +1,77 @@
+#
+%manual
+%include <man/copy_public.man>
+%end
+
+%include <head_4_bash.h>                                # Include header common to all tasks.
+                                                        # It manages general calls to ecflow client
+%include <etc/general.ini>
+
+#=========================================================
+
+echo -e "\tThe task \"copy_public.ecf\" for the copying plots process to \"${public_root_dir}\" is now starting."
+
+# Current date from ecflow variable
+DATE="%ECF_DATE%"
+
+# Bulletin date
+DATEB=$( date -u -d "$DATE $bulletin_date_delta" +%%Y%%m%%d )
+
+YYYYB="${DATEB:0:4}"
+MMB="${DATEB:4:2}"
+DDB="${DATEB:6:2}"
+
+# ********** Directories of files to be copied **********
+
+output_dir_plots="${output_dir_tpl//%%year%%/${YYYYB}}"
+output_dir_plots="${output_dir_plots//%%month%%/${MMB}}"
+output_dir_plots="${output_dir_plots//%%day%%/${DDB}}"
+
+output_dir_csv="${output_dir_csv_tpl//%%year%%/${YYYYB}}"
+output_dir_csv="${output_dir_csv//%%month%%/${MMB}}"
+output_dir_csv="${output_dir_csv//%%day%%/${DDB}}"
+
+# **** Public directories of destination for web-page sharing ****
+public_root_dir="${public_root_dir}"
+public_root_dir_csv="${public_root_dir_csv}"
+
+echo "The 'output_dir' root directory used for the sharing web-page is: \"${public_root_dir}\" for the graphs." 
+echo "The 'output_dir' root directory used for the sharing web-page is: \"${public_root_dir_csv}\" for the csv files."
+
+#====================================================================================
+
+if [[ ! -d "${public_root_dir}"     ]]; then 
+    echo   "The public_root_dir: \"$public_root_dir\" doesn't exists. It will be created right now."; 
+    mkdir -p "${public_root_dir}" || { echo "WARNING: The output_public_dir: \"$output_public_dir\" can't be created. Check the permits."; ERROR; }; 
+fi
+
+if [[ ! -d "${public_root_dir_csv}" ]]; then
+    echo "The public_root_dir_csv: \"$public_root_dir_csv\" doesn't exists. It will be created right now.";
+    mkdir -p "${public_root_dir_csv}" || { echo "WARNING: The output_public_dir_csv: \"$output_public_dir_csv\" can't be created. Check the permits."; ERROR; };
+fi
+
+OKKO=0
+if [[ -d "${public_root_dir}" && -d "${public_root_dir_csv}" ]]; then
+    rsync -vt   ${output_dir_plots}/*    --include="*.png"    --include="*.gif"    --include="*.pdf"    --include="*.jpg"    --include="*.jpeg"    "${public_root_dir}" || OKKO=1
+    rsync -vt   ${output_dir_csv}/*    "${public_root_dir_csv}" || OKKO=1
+else
+    echo -e "Warning: The archiviation directory \"${public_root_dir}\" and/or \"${public_root_dir_csv}\" doesn't exist."
+    OKKO=1
+fi
+
+if [[ $OKKO -eq 0 ]]; then 
+    echo "The copying process from $output_dir_plots to $public_root_dir has been succesfully done."  
+    echo "The copying process from $output_dir_csv to $public_root_dir_csv has been succesfully done."
+else                       
+    echo "ERROR: The copying process from $output_dir_plots to $public_root_dir or from ${output_dir_csv} to ${public_root_dir_csv}  hasn't been succesfully done."  
+fi
+
+echo "The task that \"copy_public.ecf\" is finished."
+
+EXIT_STATUS=$?
+
+   echo -e "\n\tExecution completed with EXIT_STATUS=${EXIT_STATUS}\n\n"
+
+%include <tail_4_bash.h>               # Include tail common to all tasks.
+                                       # It manages general calls to ecflow client
+

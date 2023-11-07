@@ -1,0 +1,33 @@
+# Include the manual of this task
+%manual
+%include <man/remove_all_tmp_dir.man>
+%end
+
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+# Include a family-specific initialisation file
+%include <etc/general.ini>
+
+# ==================================================
+#           Remotion of working directories
+# ==================================================
+
+GOON=0
+
+if [ -d "$tmp_root_dir" ]; then
+
+    rm -r "$tmp_root_dir" || GOON=1
+    if [ $GOON -eq 0 ] ; then
+        echo -e "\n\tThe remotion of the \"${tmp_root_dir}\" directory has been correctly done.\n"
+    else
+        echo -e "\n\tERROR! The \"${tmp_root_dir}\" directory can't be removed.\n"
+    fi
+
+else
+    echo -e "\n\tWARNING: the \"${tmp_root_dir}\" directory doesn't exist. It can't be removed.\n"
+fi
+
+echo -e "\n\tThe task is terminated with EXIT STATUS=${GOON}.\n"
+
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

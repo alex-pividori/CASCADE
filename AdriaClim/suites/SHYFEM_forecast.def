@@ -1,0 +1,204 @@
+# +---------------------------------------------------------------------------+
+#
+# This is the ecFlow suite definition driving the operational flow voted to the
+# monitor the INTERREG IT-HR CASCADE projects activities on the Fenice cluster.
+# In particular, this flow creates a set of forecast plots starting from SHYFEM
+# simulations and share the results on public web-pages.
+#
+
+suite SHYFEM_forecast 
+  cron 13:31 
+
+  #   ENVIRONMENTAL VARIABLES DEFINITION START
+  #
+  # Directory. It is used as a prefix portion of the path of the job files created by ecFlow server
+  # 
+    edit ECF_HOME    /u/arpa/pividoria/ecflow
+  #
+  # Directory. It is used to find the ecFlow files
+  # 
+    edit ECF_FILES   /u/arpa/pividoria/suites/SHYFEM_forecast
+  #
+  # Directory: It is used to find the files to be included in the nodes
+  # 
+    edit ECF_INCLUDE /u/arpa/pividoria/suites/SHYFEM_forecast/include
+  #
+  # Number of times a job should be rerun if it aborts (default is 2)
+  # 
+    edit ECF_TRIES  1 
+  #
+  # Number of seconds to sleep at the end of each task (Not necessary, but suggested to avoid task overlapping)
+  # 
+  
+  #
+  #   ENVIRONMENTAL VARIABLES DEFINITION STOP
+  #
+
+  edit SLEEP 3
+
+# ==========================================
+
+ 
+family proc
+ 
+    task data_spy
+        time  13:32 13:33  00:01
+        event data_available
+
+    task set_dir
+        trigger data_spy:data_available
+        complete data_spy eq complete and not data_spy:data_available
+
+family plots
+    complete data_spy eq complete and not data_spy:data_available
+
+    task csv_postproc
+        trigger ../set_dir eq complete
+
+    family TS_diagram
+        trigger ../set_dir eq complete
+        task master_plots
+        edit PLOT_TYPE  "TS_diagram_NCL"
+    endfamily
+
+    family TS_multi_diagram
+        trigger ../set_dir eq complete
+        task master_plots     
+        edit PLOT_TYPE  "TS_multi_diagram_NCL"  
+    endfamily
+
+    family profiles
+        trigger ../set_dir eq complete
+        task master_plots
+        edit PLOT_TYPE  "profiles_PYTHON"
+    endfamily
+
+    family time_series_temp
+        trigger ../set_dir eq complete
+        task master_plots
+        edit PLOT_TYPE  "time_series_temp_PYTHON"
+    endfamily
+
+    family time_series_sal
+        trigger ../set_dir eq complete
+        task master_plots
+        edit PLOT_TYPE  "time_series_sal_PYTHON"
+    endfamily
+
+    family time_series_temp_multy_day
+        trigger ../set_dir eq complete
+        task master_plots
+        edit PLOT_TYPE  "time_series_temp_multy_day_PYTHON"
+    endfamily
+
+    family time_series_sal_multy_day
+        trigger ../set_dir eq complete
+        task master_plots
+        edit PLOT_TYPE  "time_series_sal_multy_day_PYTHON"
+    endfamily
+
+    family time_series_lines_temp_sal
+        trigger ../set_dir eq complete
+        task master_plots
+        edit PLOT_TYPE  "time_series_lines_temp_sal_PYTHON"
+    endfamily
+
+    family time_series_lines_temp_sal_multy_day
+        trigger ../set_dir eq complete
+        task master_plots
+        edit PLOT_TYPE  "time_series_lines_temp_sal_multy_day_PYTHON"
+    endfamily
+
+    family time_series_lines_height_multy_day
+        trigger ../set_dir eq complete
+        task master_plots
+        edit PLOT_TYPE  "time_series_lines_height_multy_day_PYTHON"
+    endfamily
+
+    family gif
+        trigger ../set_dir eq complete
+     
+        family T
+            edit VAR2PLOT "temperature"
+            edit SHY_FILE_EXT "ts.shy"
+            edit PLOT_TYPE "hs_gif_T_SHYFEM"
+            task t_shyfem_ps2gif
+        endfamily
+        family S
+            edit VAR2PLOT "salinity"
+            edit SHY_FILE_EXT "ts.shy"
+            edit PLOT_TYPE "hs_gif_S_SHYFEM"
+            task t_shyfem_ps2gif
+        endfamily
+        family Z
+            edit VAR2PLOT "zeta"
+            edit SHY_FILE_EXT "hydro.shy"
+            edit PLOT_TYPE "hs_gif_Z_SHYFEM"
+            task t_shyfem_ps2gif
+        endfamily
+        family UV
+            edit VAR2PLOT "vel"
+            edit SHY_FILE_EXT "hydro.shy"
+            edit PLOT_TYPE "hs_gif_UV_SHYFEM"
+            task t_shyfem_ps2gif
+        endfamily
+    endfamily
+
+endfamily
+endfamily
+
+#===========================================
+#     Family plots archive public plots
+#===========================================
+
+family archive
+    trigger proc eq complete
+    complete proc/data_spy eq complete and not proc/data_spy:data_available
+      
+        task copy_public
+
+endfamily
+
+#============================================
+#          Remote delivery files
+#============================================
+
+family delivery
+    trigger archive eq complete
+    complete proc/data_spy eq complete and not proc/data_spy:data_available
+
+    edit FAM_DEF 'delivery'
+    task t_ncftpdiss
+         edit FTP_CLEAN 'n'
+         edit FTP_COMPL 'y'
+         label TRANSF ""
+endfamily
+
+#============================================
+#                Clean family 
+#============================================
+
+family clean
+    trigger archive eq complete
+    complete proc/data_spy eq complete and not proc/data_spy:data_available
+
+        task t_clean
+
+endfamily
+
+#============================================
+#        Remove tmp directory family
+#============================================
+
+family remove_dir
+    trigger proc eq complete
+    complete proc/data_spy eq complete and not proc/data_spy:data_available
+
+    task remove_all_tmp_dir
+
+endfamily
+
+#============================================
+
+endsuite
+

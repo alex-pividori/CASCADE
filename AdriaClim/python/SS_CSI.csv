@@ -1,0 +1,10 @@
+#
+# Bin intervals: [1.0, 12.0, 15.0, 17.0, 25.0].
+# SS_Aindex: Skill Score between model and reference 'Aindex'. SS_Aindex = ( A - A_ref )/( A_perf - A_ref ).
+# CSI: Critical Success Index or Threat Score (TS).
+#
+Bin_interval;SS_CSI
+[1.0,12.0[;-1.083
+[12.0,15.0[;-0.313
+[15.0,17.0[;-0.130
+[17.0,25.0[;-0.917

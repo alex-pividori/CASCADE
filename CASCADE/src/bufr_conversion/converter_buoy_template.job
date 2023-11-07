@@ -1,0 +1,68 @@
+#!/bin/bash
+
+#******************************************************************************
+#
+# DESCRIPTION:      This bash job script is used to ran two different python
+#                   script used to convert data from csv/mis to BUFR format.
+#                   buoy_tipe variable vaule is necessary to decide which script
+#                   is throwing.   
+#
+# EXTERNAL CALLS:   /bufr_conversion/buoy_bufr_conversion/launcher_buoy_converter.ecf
+#
+# EXTERNAL FILES:   - cortek_buoy2csv.py
+#                   - nke-wimo_buoy2csv.py
+#               
+# DEVELOPER:        Alex Pividori (alex.pividori@arpa.fvg.it)
+#                   ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#                   "CASCADE" Interreg IT-HR project
+#
+# SOFTWARE VERSION: Python 3.7.11 (default, Jul 27 2021, 14:32:16) [GCC 7.5.0]
+#                   eccodes/2.13.0/intel/19.1.1.217-ip7puyk
+#
+# CREATION DATE:    18/11/2022
+#
+# MODIFICATIONS:    18/11/2022 --> Transformation into a job
+#                   24/11/2022 --> Documentation insert                  
+#
+# VERSION:          0.1
+#
+#******************************************************************************
+
+#PBS -N buoy_converter
+#PBS -o stdout_buoy
+#PBS -e stderr_buoy
+#PBS -P CASCADE
+#PBS -W umask=0002
+#PBS -q arpa
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=00:10:00
+##PBS -m abe
+##PBS -M alex.pividori@arpa.fvg.it
+#PBS -W block=true
+
+cd %%tmp_dir_root%% || { echo "ERROR inside \"converter_buoy\" job. I can't move to %%tmp_dir_root%%"; exit; }
+
+#********* Modules loading *********
+module purge
+module load %%python_module%%
+module load %%eccodes_module%%
+
+buoy_type="%%b_type%%"     # this variable can be nke_wimo or cortek
+buoy="%%buoy%%"            # this is the label of the specific buoy: "RFVGCORON4"  "AFVGBARBAN" for cortek buoys and "5228" "5229" "522f" for nke_wimo buoys.
+
+input_dir="%%input_dir%%"
+output_dir="%%output_dir%%"
+
+#===============================================================================================================
+
+if   [[ "${buoy_type}" == "cortek" ]];   then
+
+    python cortek_buoy2csv.py   "${input_dir}" "${output_dir}" "$buoy"  &&  echo -e "\tcortek   buoy conversion for \"$buoy\" buoy has been correctly completed" ; 
+
+elif [[ "${buoy_type}" == "nke_wimo" ]]; then
+
+    python nke-wimo_buoy2csv.py "${input_dir}" "${output_dir}" "$buoy"  &&  echo -e "\tnke_wimo buoy conversion for \"$buoy\" buoy has been correctly completed" ; 
+
+else
+    echo "ERROR: buoy type \"${buoy_type}\" doesn't exist. It has to be \"cortek\" or \"nke_wimo\"."
+fi

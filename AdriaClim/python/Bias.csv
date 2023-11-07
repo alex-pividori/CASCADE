@@ -1,0 +1,9 @@
+#
+# Bin intervals: [1.0, 12.0, 15.0, 17.0, 25.0].
+# Bias: Bias in categorical forecast.
+#
+Bin_interval;Bias
+[1.0,12.0[;0.714
+[12.0,15.0[;1.194
+[15.0,17.0[;1.167
+[17.0,25.0[;0.754

@@ -1,0 +1,13 @@
+#=========================================================================
+#                          'copy_public' task manual
+#=========================================================================
+
+Copy public 'copy_public.ecf' is a very simple task used to copy the entire 
+set of plots/animation created into a reserved directory used to share 
+the results on-line on a web-apege. CSV data files are also copied to be included
+in the sharing public web-page. 
+
+The files are daily overwritten and so no remotion is needed. The path
+reserved for sharing by an html page is included in the 'general.ini'
+initialization file. The string variable is 'public_root_dir'.  
+A series of checks are included in the task. 

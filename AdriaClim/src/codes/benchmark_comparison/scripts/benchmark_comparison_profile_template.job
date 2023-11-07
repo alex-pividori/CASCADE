@@ -1,0 +1,146 @@
+#!/bin/bash
+
+#******************************************************************************
+#
+# DESCRIPTION:      This bash script is used to create CSV outputfiles containing
+#                   a series of statistical indicators based on a SHYFEM simulation
+#                   
+#
+# EXTERNAL CALLS:   none.
+#
+# EXTERNAL FILES:  - input NetCDF data file
+#                   
+#              
+#
+# DEVELOPER:         Alex Pividori (alex.pividori@arpa.fvg.it)
+#                    ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#                   "AdriaClim" Interreg IT-HR project
+#
+# SOFTWARE VERSION: Bash
+#                   CDO version 1.9.8
+#
+# CREATION DATE:    13/07/2022
+#
+# MODIFICATIONS:    13/07/2022 --> Transformation into a job
+#
+# VERSION:          0.1.
+#
+#******************************************************************************
+
+#========================= Temperature Version =======================
+
+#PBS -N gr_bm
+#PBS -o stdout_gr
+#PBS -e stderr_gr
+#PBS -P AdriaClim
+#PBS -W umask=0002
+#PBS -q arpa
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=00:30:00
+##PBS -m abe
+##PBS -M alex.pividori@arpa.fvg.it
+#PBS -W block=true
+
+var="%%var%%"
+working_dir="%%tmp_dir_root%%"
+simulation_arc_dir="%%simulation_arc_dir%%"
+stat_index="%%stat_index%%"
+
+cd %%tmp_dir_root%%
+
+# module loading
+#module load %%python_module%%        &>/dev/null
+module load %%miniconda_module%%     &>/dev/null
+module load %%cdo_module%%           &>/dev/null
+
+#***********************************
+
+netCDF_dir="$simulation_arc_dir/%%SIMULATION_CODE%%/NetCDF"
+output_dir="$working_dir/output"
+
+if [ ! -d $output_dir ]; then mkdir $output_dir; fi
+if [[ "$var" == "water_level" ]]; then suffix="hydro"; else suffix="ts"; fi
+
+# temporary files
+tmp_temp_file="profile_temp_tmp.txt"  # for a profile analysis, only level-dependent fields are relevant
+tmp_sal_file="profile_sal_tmp.txt"
+tmp_psd_file="profile_temp-sal_tmp.txt"
+
+#==============================================================================================================================
+
+while IFS=';' read    node_name  month  # this version extract the data for the entire depth, the level is not useful anymore
+do
+
+	netCDF_file="$( find $netCDF_dir -name  %%SIMULATION_CODE%%-EXTnode*-${node_name}-SHYnode*-NetCDFnode*.${suffix}.nc -type f )"
+    
+if [[ "%%SIMULATION_CODE%%" != "1997F100D0_C001" ]]; then
+	label_file_name="$( find $netCDF_dir/.. -name  AdriaClim-*.csv -type f -printf "%f\n" )"
+	IFS="_" read -a label_arr <<< $label_file_name
+
+	label_model="$( find $netCDF_dir/../input/adri  -name  temp_*_rcp*_mon_*.fem -type f -printf "%f\n" )"
+	IFS="_" read -a label_model_arr <<< $label_model
+
+	RCP=${label_arr[2]:3:2}
+	year_in=${label_arr[4]:0:4}
+	year_fin=${label_arr[5]:0:4}
+	global_model=${label_model_arr[4]}
+	regional_model=${label_model_arr[7]}
+fi
+
+ 
+:<<blocco     
+
+# this is a temporary piece of code used for simulations by NEMO boundary conditions 
+
+#       temp_dme_B02_NEMO_mon_203501_204512.fem
+
+        label_model="$( find $netCDF_dir/../input/adri  -name  temp_*_*_mon_*.fem -type f -printf "%f\n" )"
+        IFS="_" read -a label_model_arr <<< $label_model
+
+        
+        RCP="85"
+        year_in=${label_model_arr[5]:0:4}
+        year_fin=${label_model_arr[6]:0:4}
+        global_model=${label_model_arr[3]}
+        regional_model="wrf"   
+blocco
+
+	IFS=";" read -a latlon_arr <<< "$( grep "$node_name" /lustre/arpa/AdriaClim/etc/EXT_nodes/list_of_EXT_nodes.csv )"
+	lat_n=${latlon_arr[1]}
+	lon_n=${latlon_arr[0]}
+
+	if [ $month -eq 0 ]; then        # month equal to 0 means annual analysis
+                                         # every cycle the tmp file will be overwritten
+                cdo outputf,%1.4g,1                              -selname,temperature    $netCDF_file > "$tmp_temp_file"
+                cdo outputf,%1.4g,1                              -selname,salinity       $netCDF_file > "$tmp_sal_file"
+        else
+		if [[ "$stat_index" == "mean" ]]; then
+                       cdo outputf,%1.4g,1  -ymonmean -selmonth,$month  -selname,temperature    $netCDF_file  > "$tmp_temp_file"
+                       cdo outputf,%1.4g,1  -ymonmean -selmonth,$month  -selname,salinity       $netCDF_file  > "$tmp_sal_file"
+		elif [[ "$stat_index" == "median" ]]; then
+                       cdo outputf,%1.4g,1  -ymonpctl,50 -selmonth,$month  -selname,temperature  $netCDF_file  \
+                                            -ymonmin     -selmonth,$month  -selname,temperature  $netCDF_file  \
+                                            -ymonmax     -selmonth,$month  -selname,temperature  $netCDF_file > "$tmp_temp_file"
+
+                       cdo outputf,%1.4g,1  -ymonpctl,50 -selmonth,$month  -selname,salinity  $netCDF_file     \
+                                            -ymonmin     -selmonth,$month  -selname,salinity  $netCDF_file     \
+                                            -ymonmax     -selmonth,$month  -selname,salinity  $netCDF_file    > "$tmp_sal_file"
+                else
+                       echo -e "\tERROR:\"stat_index\"=$stat_index not correct\n"
+		fi
+        fi
+
+#************** temperature and salinity data merging: depth level, temperature, salinity ****************
+paste -d ";" levels_depth.txt $tmp_temp_file $tmp_sal_file > $tmp_psd_file
+
+if [[ ! "%%SIMULATION_CODE%%" == "1997F100D0_C001" ]]; then
+	echo "I'm running \"profile_analysis.py\" for %%SIMULATION_CODE%% simulation in $month period "%%SIMULATION_CODE%%" ${node_name} $RCP $year_in $year_fin ${lat_n:0:5} ${lon_n:0:5}"
+	python  profile_analysis.py $month  "%%SIMULATION_CODE%%" ${node_name} $RCP $year_in $year_fin ${lat_n:0:5} ${lon_n:0:5} \
+                                    $global_model $regional_model $var $stat_index  # &&  rm $tmp_temp_file  $tmp_sal_file $tmp_psd_file
+else
+	echo "I'm running \"profile_analysis.py\" for %%SIMULATION_CODE%% simulation in $month period"
+        python  profile_analysis.py $month  "BENCHMARK" ${node_name} "BENCHMARK" "2010" "2020" ${lat_n:0:5} ${lon_n:0:5} "BENCHMARK" "BENCHMARK" $var $stat_index
+fi
+
+
+done  < %%init_file%%

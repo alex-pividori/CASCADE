@@ -1,0 +1,26 @@
+#===================================================================================
+#                                'csv_postproc' MANUAL              
+#===================================================================================
+
+'csv_postproc' task is used to manage the job 'csv_edit_job_launch_template.job' used to
+create the edited csv data files starting from the original raw data outputs of SHYFEM model.
+
+The shyfem depths are calculated at the beginning of the task and saved in a unique file 
+called 'file_depths_tmp.txt'.
+
+The depth levels are read inside the '\$info_file': an ascii file contained in every 
+daily shyfem simulation in which you can find a lot of essential informations about 
+the simulation performed. 
+
+A bash 'case' is used to set the initialization file to read and the module to load  
+according to the 'var_csv' bash array defined in 'general.ini'. All these files and
+variables names are included in the 'general.ini' file in include/etc directory.
+
+The philosophy of this task is to cycle between the physical dimensions we want to edit 
+the raw data file. The editing process consists in a header (containing: lat, lon, node label, 
+physical quantity and relative unit, bathymetry, bulletin date and SHYFEM simulation domain) 
+inserted at the beginning of the file, a columns despription and a conversion from a '\s' space 
+separator file to a ';' semicolon separator (that's customizable by 'general.ini').
+
+The starting raw data and the edited output files contains the entire 5 days simulation 
+and are characterised by one shyfem node and one single physical quantity. 

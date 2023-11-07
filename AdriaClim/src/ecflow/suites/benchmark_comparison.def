@@ -1,0 +1,87 @@
+# +---------------------------------------------------------------------------+
+#
+# This is the ecFlow suite definition driving the operational flow voted to the
+# monitor the INTERREG IT-HR projects activities on the C3HPC cluster and to 
+# report its operational status                   
+#
+suite benchmark_comparison
+   
+  #   ENVIRONMENTAL VARIABLES DEFINITION START
+  #
+  # Directory. It is used as a prefix portion of the path of the job files created by ecFlow server
+  # 
+    edit ECF_HOME    /lustre/arpa/scratch/ecflow/AdriaClim
+  #
+  # Directory. It is used to find the ecFlow files
+  # 
+    edit ECF_FILES   /lustre/arpa/scratch/pividoria/AdriaClim/src/ecflow/suites/benchmark_comparison
+  #
+  # Directory: It is used to find the files to be included in the nodes
+  # 
+    edit ECF_INCLUDE /lustre/arpa/scratch/pividoria/AdriaClim/src/ecflow/suites/benchmark_comparison/include
+  #
+  #
+  #
+  # Number of times a job should be rerun if it aborts (default is 2)
+  # 
+    edit ECF_TRIES  1 
+  #
+  # Number of seconds to sleep at the end of each task (Not necessary, but suggested to avoid task overlapping)
+  # 
+  
+  #
+  #   ENVIRONMENTAL VARIABLES DEFINITION STOP
+  #
+
+  edit SLEEP 2
+
+#=============================== BENCHMARK_comparison ===============================
+# This is the family only used for the CSV file with the statistical indexes inside
+
+#family BENCHMARK_comparison_stat  
+ 
+#   task set_dir
+
+#   task extract_analyze_data
+#     trigger set_dir eq complete
+#     repeat string SHYFEM_SIMULATION_CODE  1997F100D0_D106 1997F100D0_D124 1997F100D0_D125 1997F100D0_D126 1997F100D0_D127 1997F100D0_D128 1997F100D0_D129 1997F100D0_D130 1997F100D0_D131 1997F100D0_D132 1997F100D0_D133 1997F100D0_D134 1997F100D0_D135 1997F100D0_D136 1997F100D0_D137 1997F100D0_D138 1997F100D0_D139 1997F100D0_D140 1997F100D0_D141 1997F100D0_D142 1997F100D0_D143 1997F100D0_D144 1997F100D0_D145 1997F100D0_D146 1997F100D0_D147 1997F100D0_D148 1997F100D0_D149 1997F100D0_D150 1997F100D0_D151 1997F100D0_D152 1997F100D0_D153 1997F100D0_D154 1997F100D0_D155 1997F100D0_D156 1997F100D0_D157 1997F100D0_D158 1997F100D0_D159 1997F100D0_D160 1997F100D0_D161 1997F100D0_D162 1997F100D0_D163 1997F100D0_D164 1997F100D0_D165 1997F100D0_D166 1997F100D0_D167 1997F100D0_D168 1997F100D0_D169 1997F100D0_D170
+
+#endfamily
+
+#============================ BENCHMARK_comparison_profile ===========================
+# This is the family only used for the CSV file with the statistical indexes inside
+
+#family BENCHMARK_comparison_profile
+
+#  task set_dir
+
+#  task extract_analyze_data_profile
+#    trigger set_dir eq complete
+#    repeat string  SHYFEM_SIMULATION_CODE  1997F100D0_C001   1997F100D0_D101 1997F100D0_D102 1997F100D0_D103 1997F100D0_D104 1997F100D0_D105 1997F100D0_D106 1997F100D0_D107 1997F100D0_D108 1997F100D0_D109 1997F100D0_D110 1997F100D0_D111 1997F100D0_D112 1997F100D0_D113 1997F100D0_D114 1997F100D0_D115 1997F100D0_D116 1997F100D0_D117 1997F100D0_D118 1997F100D0_D119 1997F100D0_D120 1997F100D0_D121 1997F100D0_D122 1997F100D0_D123 1997F100D0_D124 1997F100D0_D125 1997F100D0_D126 1997F100D0_D127 1997F100D0_D128 1997F100D0_D129 1997F100D0_D130 1997F100D0_D131 1997F100D0_D132 1997F100D0_D133 1997F100D0_D134 1997F100D0_D135 1997F100D0_D136 1997F100D0_D137 1997F100D0_D138 1997F100D0_D139 1997F100D0_D140 1997F100D0_D141 1997F100D0_D142 1997F100D0_D143 1997F100D0_D144 1997F100D0_D145 1997F100D0_D146 1997F100D0_D147 1997F100D0_D148 1997F100D0_D149 1997F100D0_D150 1997F100D0_D151
+
+#  task master_plot
+#    trigger extract_analyze_data_profile eq complete
+
+#endfamily
+
+#=============================================================================
+# This is the suite used to create the temp-sal profiles graphs (with Python)
+#=============================================================================
+# 1997F100D0_C001 serial code have to be present for the comparison
+
+family BENCHMARK_comparison_profile
+
+  task set_dir
+
+  task extract_analyze_data_profile
+    trigger set_dir eq complete
+    repeat string  SHYFEM_SIMULATION_CODE 1997F100D0_C001 1997F100D0_D152 1997F100D0_D153 1997F100D0_D154 1997F100D0_D155 1997F100D0_D156 1997F100D0_D157 1997F100D0_D158 1997F100D0_D159 1997F100D0_D160 1997F100D0_D161 1997F100D0_D162 1997F100D0_D163 1997F100D0_D164 1997F100D0_D165 1997F100D0_D166 1997F100D0_D167 1997F100D0_D168 1997F100D0_D169 1997F100D0_D170
+
+  task master_plot
+	trigger extract_analyze_data_profile eq complete
+
+endfamily
+
+#===========================================================================
+
+endsuite

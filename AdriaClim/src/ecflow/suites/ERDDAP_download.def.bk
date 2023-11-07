@@ -1,0 +1,356 @@
+# ******************************************************************************
+#
+#  DESCRIPTION:   this "ecFlow" suite is dedicated to the download of data from
+#                 the ERDDAP data server of the "Centro Euro-Mediterraneo sui
+#                 Cambiamenti Climatici" (CMCC) and to the conversion of the
+#                 data thelselves in the format suitable for the SHYFEM model.
+#                 A detailed description of the suite can be retrieved in its
+#                 related manual.
+#
+#  DEVELOPER:     Alessandro Minigher (alessandro.minigher@arpa.fvg.it)
+#                 ARPA FVG - S.O.C. Osmer e GRN - S.O.S. Qualità dell aria
+#
+#  CREATION DATE: 2022-11-09.
+#
+#  MODIFICATIONS: none.
+#
+#  VERSION:       0.1.
+#
+# ******************************************************************************
+
+suite ERDDAP_download
+
+
+    # **********************
+    # * DEFINITION SECTION *
+    # **********************
+
+    # Directory used as a prefix portion of the path of the job files created
+    # by "ecFlow" server
+    edit ECF_HOME /lustre/arpa/scratch/AdriaClim/ecflow
+
+    # Directory used to find the "ecFlow" files
+    edit ECF_FILES /lustre/arpa/AdriaClim/src/ecflow/suites/ERDDAP_download
+
+    # Directory used to find the files to be included in the nodes
+    edit ECF_INCLUDE /lustre/arpa/AdriaClim/src/ecflow/suites/ERDDAP_download/include
+
+    # Number of times a job should be rerun if it aborts (default is 2)
+    edit ECF_TRIES 1
+
+    # Number of seconds to sleep at the end of each task (not necessary, but
+    # suggested to avoid task overlapping)
+    edit SLEEP 3
+
+    # Root directory used to store initialisation files (it is a feature of the
+    # ARPA FVG - CRMA implementation of "ecFlow")
+    edit SUITE_INI_FILE /lustre/arpa/AdriaClim/src/ecflow/suites/ERDDAP_download/include
+
+    # Root directory for job summary reports storage. If it is not defined, the
+    # reports are going to be saved in %ECF_HOME%. The summary is a csv file
+    # (%YYYY%_ecFlow_jobs-summary.csv)
+    edit JOBS_REPORT_DIR /lustre/arpa/AdriaClim/data/monit/ecflow/jobs_sum
+
+    # Number of main families (datasets) that are allowed to run in parallel
+    limit dataset_limit 1
+    # Number of downloads that are allowed to run in parallel
+    limit download_limit 5
+
+    # Real clock
+    clock real
+ 
+
+    # ******************
+    # * FAMILY SECTION *
+    # *****************
+
+    # --- DATASET ---
+    family DATASET_1
+
+        # Starting date of the time period to download ("YYYYMMDD")
+        edit DATE_START "20020101"
+        # Ending date of the time period to download ("YYYYMMDD")
+        edit DATE_END "20021231"
+
+        inlimit -n dataset_limit
+
+        # --- MARINE DATA ---
+        family marine
+           # --- TEMPERATURE ---
+           family T
+               edit VAR "votemper"
+               family download
+                   inlimit -n download_limit
+                   task t_ERDDAP_download
+               endfamily
+               family postproc
+                   defstatus complete
+                   trigger download eq complete
+                   task t_ERDDAP_marine_postproc
+               endfamily
+               family archive
+                   defstatus complete
+                   trigger postproc eq complete
+                   task t_ERDDAP_archive
+               endfamily
+               family clean
+                   defstatus complete
+                   trigger archive eq complete
+                   task t_ERDDAP_clean
+               endfamily
+           endfamily
+           # ------
+           # --- SALINITY ---
+           family S
+               edit VAR "vosaline"
+               family download
+                   inlimit -n download_limit
+                   task t_ERDDAP_download
+               endfamily
+               family postproc
+                   defstatus complete
+                   trigger download eq complete
+                   task t_ERDDAP_marine_postproc
+               endfamily
+               family archive
+                   defstatus complete
+                   trigger postproc eq complete
+                   task t_ERDDAP_archive
+               endfamily
+               family clean
+                   defstatus complete
+                   trigger archive eq complete
+                   task t_ERDDAP_clean
+               endfamily
+           endfamily
+           # ------
+           # --- WATER LEVEL ---
+           family Z
+               edit VAR "SL_S_ster_avg"
+               family download
+                   inlimit -n download_limit
+                   task t_ERDDAP_download
+               endfamily
+               family postproc
+                   defstatus complete
+                   trigger download eq complete
+                   task t_ERDDAP_marine_postproc
+               endfamily
+               family archive
+                   defstatus complete
+                   trigger postproc eq complete
+                   task t_ERDDAP_archive
+               endfamily
+               family clean
+                   defstatus complete
+                   trigger archive eq complete
+                   task t_ERDDAP_clean
+               endfamily
+           endfamily
+           # ------
+           # --- CURRENTS ---
+           family UV
+               defstatus complete
+               edit VAR "currents"
+               family download
+                   family U
+                       edit VAR "vozocrtx"
+                       inlimit -n download_limit
+                       task t_ERDDAP_download
+                   endfamily
+                   family V
+                       edit VAR "vomecrty"
+                       inlimit -n download_limit
+                       task t_ERDDAP_download
+                   endfamily
+               endfamily
+               family postproc
+                   trigger download eq complete
+                   task t_ERDDAP_currents_postproc
+               endfamily
+               family archive
+                   trigger postproc eq complete
+                   task t_ERDDAP_archive
+               endfamily
+               family clean
+                   trigger archive eq complete
+                   task t_ERDDAP_clean
+                   family U
+                       edit VAR "vozocrtx"
+                       task t_ERDDAP_clean
+                   endfamily
+                   family V
+                       edit VAR "vomecrty"
+                       task t_ERDDAP_clean
+                   endfamily
+               endfamily
+           endfamily
+           # ------
+        endfamily
+        # ------
+        # --- METEOROLOGICAL DATA ---
+        family meteo
+            # --- WIND ---
+            family wind
+               defstatus complete
+               edit VAR "wind"
+               family download
+                   family U10
+                       edit VAR "u_10m_gr"
+                       inlimit -n download_limit
+                       task t_ERDDAP_download
+                   endfamily
+                   family V10
+                       edit VAR "v_10m_gr"
+                       inlimit -n download_limit
+                       task t_ERDDAP_download
+                   endfamily
+                   family SLP
+                       edit VAR "slp"
+                       inlimit -n download_limit
+                       task t_ERDDAP_download
+                   endfamily
+               endfamily
+               family postproc
+                   trigger download eq complete
+                   task t_ERDDAP_wind_postproc
+               endfamily
+               family archive
+                   trigger postproc eq complete
+                   task t_ERDDAP_archive
+               endfamily
+               family clean
+                   trigger archive eq complete
+                   task t_ERDDAP_clean
+                   family U10
+                       edit VAR "u_10m_gr"
+                       task t_ERDDAP_clean
+                   endfamily
+                   family V10
+                       edit VAR "v_10m_gr"
+                       task t_ERDDAP_clean
+                   endfamily
+                   family SLP
+                       edit VAR "slp"
+                       task t_ERDDAP_clean
+                   endfamily
+               endfamily
+            endfamily
+            # ------
+            # --- HEAT ---
+            family heat
+               edit VAR "heat"
+               family download
+                   family T2M
+                       edit VAR "T_2m"
+                       inlimit -n download_limit
+                       task t_ERDDAP_download
+                   endfamily
+                   family Q2M
+                       edit VAR "q_2m"
+                       inlimit -n download_limit
+                       task t_ERDDAP_download
+                   endfamily
+                   family SW
+                       defstatus complete
+                       edit VAR "SW_d"
+                       task t_ERDDAP_download
+                   endfamily
+                   family TCC
+                       defstatus complete
+                       edit VAR "tcc"
+                       inlimit -n download_limit
+                       task t_ERDDAP_download
+                   endfamily
+               endfamily
+               family postproc
+                   defstatus complete
+                   trigger download eq complete
+                   task t_ERDDAP_heat_postproc
+               endfamily
+               family archive
+                   defstatus complete
+                   trigger postproc eq complete
+                   task t_ERDDAP_archive
+               endfamily
+               family clean
+                   defstatus complete
+                   trigger archive eq complete
+                   task t_ERDDAP_clean
+                   family T2M
+                       edit VAR "T_2m"
+                       task t_ERDDAP_clean
+                   endfamily
+                   family Q2M
+                       edit VAR "q_2m"
+                       task t_ERDDAP_clean
+                   endfamily
+                   family SW
+                       edit VAR "SW_d"
+                       task t_ERDDAP_clean
+                   endfamily
+                   family TCC
+                       edit VAR "tcc"
+                       task t_ERDDAP_clean
+                   endfamily
+               endfamily
+            endfamily
+            # ------
+            # --- RAIN ---
+            family rain
+               defstatus complete
+               edit VAR "precip_tot"
+               family download
+                   inlimit -n download_limit
+                   task t_ERDDAP_download
+               endfamily
+               family postproc
+                   trigger download eq complete
+                   task t_ERDDAP_rain_postproc
+               endfamily
+               family archive
+                   trigger postproc eq complete
+                   task t_ERDDAP_archive
+               endfamily
+               family clean
+                   trigger archive eq complete
+                   task t_ERDDAP_clean
+               endfamily
+            endfamily
+            # ------
+        endfamily
+        # ------
+        # --- HYDROLOGICAL DATA ---
+        family river
+            defstatus complete
+            # --- STREAMFLOW [M^3/S] ---
+            family SM
+               edit VAR "streamflow_m"
+               family download
+                   inlimit -n download_limit
+                   task t_ERDDAP_river_download
+               endfamily
+               family postproc
+                   trigger download eq complete
+                   task t_ERDDAP_river_postproc
+               endfamily
+               family archive
+                   defstatus complete
+                   trigger postproc eq complete
+                   task t_ERDDAP_archive
+               endfamily
+               family clean
+                   defstatus complete
+                   trigger archive eq complete
+                   task t_ERDDAP_clean
+               endfamily
+            endfamily
+            # ------
+        endfamily
+        # ------
+
+    endfamily
+    # ------
+
+
+endsuite

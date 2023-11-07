@@ -1,0 +1,9 @@
+#
+# Bin intervals: [1.0, 12.0, 15.0, 17.0, 25.0].
+# CSI: Critical Success Index or Threat Score (TS).
+#
+Bin_interval;CSI
+[1.0,12.0[;0.000
+[12.0,15.0[;0.259
+[15.0,17.0[;0.182
+[17.0,25.0[;0.189

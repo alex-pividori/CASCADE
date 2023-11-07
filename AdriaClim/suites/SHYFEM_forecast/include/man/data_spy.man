@@ -1,0 +1,22 @@
+#================================================================================================
+#                                      'data_spy' task manual
+#================================================================================================
+
+This is the manual of the 'data_spy.ecf' task. The main goal of this task is to check the presence 
+of the SHYFEM output data files daily generated. This is the first step of the entire suite SHYFEM_forecast
+because if the row data are not available, no-plot can be realised. 
+In particular the task checks:
+
+- '$input_dir' existence
+- '$data_dir' existence
+- '$info_file' existence
+- '$nodes_info_file' existence
+- '$data_dir' not empty status
+
+These paths are included in the initialization file 'general.ini' and can be modified at any time.
+The entire set of element is essential for the following task processes. The '$input_dir' and '$data_dir'
+are personalised in according to the bulletin date. 
+If the test is passed, an event called 'data_available' is triggered and the suite process continue.
+
+The check process is repeated a certain number of times with starting time, time-step and finish time
+editable in the main suite script 'SHYFEM_forecast.def' (e.g time  00:05 00:50  00:15).

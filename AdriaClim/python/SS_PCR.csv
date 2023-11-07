@@ -1,0 +1,10 @@
+#
+# Bin intervals: [1.0, 12.0, 15.0, 17.0, 25.0].
+# SS_Aindex: Skill Score between model and reference 'Aindex'. SS_Aindex = ( A - A_ref )/( A_perf - A_ref ).
+# PCR: Probability Of Correct Rejection.
+#
+Bin_interval;SS_PCR
+[1.0,12.0[;-2.623
+[12.0,15.0[;-1.748
+[15.0,17.0[;-0.307
+[17.0,25.0[;-0.261

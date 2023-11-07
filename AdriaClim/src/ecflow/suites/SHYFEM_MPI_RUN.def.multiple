@@ -1,0 +1,4998 @@
+# ******************************************************************************
+#
+#  DESCRIPTION:   this "ecFlow" suite is dedicated to runs of the SHYFEM model,
+#                 in its MPI version.
+#                 A detailed description of the suite can be retrieved in its
+#                 related manual.
+#
+#  DEVELOPER:     Alessandro Minigher (alessandro.minigher@arpa.fvg.it)
+#                 ARPA FVG - S.O.C. Stato dell Ambiente - CRMA
+#                 "AdriaClim" Interreg IT-HR project
+#
+#  CREATION DATE: 2022-09-14.
+#
+#  MODIFICATIONS: none.
+#
+#  VERSION:       0.1.
+#
+# ******************************************************************************
+
+suite SHYFEM_MPI_RUN
+
+
+    # **********************
+    # * DEFINITION SECTION *
+    # **********************
+
+    # --- CLOCK ---
+
+    # Real clock
+    clock real
+
+    # --- ENVIRONMENTAL VARIABLES ---
+
+    # Directory used as a prefix portion of the path of the job files created
+    # by "ecFlow" server
+    edit ECF_HOME /lustre/arpa/scratch/ecflow/AdriaClim/
+
+    # Directory used to find the "ecFlow" files
+    edit ECF_FILES /lustre/arpa/AdriaClim/src/ecflow/suites/SHYFEM_MPI_RUN
+
+    # Directory used to find the files to be included in the nodes
+    edit ECF_INCLUDE /lustre/arpa/AdriaClim/src/ecflow/suites/SHYFEM_MPI_RUN/include
+
+    # Number of times a job should be rerun if it aborts (default is 2) 
+    edit ECF_TRIES 1
+
+    # Number of seconds to sleep at the end of each task (not necessary, but
+    # suggested to avoid task overlapping)
+    edit SLEEP 3
+
+    # Root directory used to store initialisation files (it is a feature of the
+    # ARPA FVG - CRMA implementation of "ecFlow")
+    edit SUITE_INI_FILE /lustre/arpa/AdriaClim/src/ecflow/suites/SHYFEM_MPI_RUN/include
+
+    # Root directory for job summary reports storage. If it is not defined, the
+    # reports are going to be saved in %ECF_HOME%. The summary is a csv file
+    # (%YYYY%_ecFlow_jobs-summary.csv)
+    edit JOBS_REPORT_DIR /lustre/arpa/AdriaClim/data/monit/ecflow/jobs_sum
+
+    # Number of simulations that are allowed to run in parallel
+    limit sim_limit 6
+
+
+    # ******************
+    # * FAMILY SECTION *
+    # ******************
+
+    family SIM_1
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC01"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_2
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC02"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_3
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC03"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_4
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC04"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_5
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC05"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_6
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC06"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_7
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC07"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_8
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC08"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_9
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC09"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_10
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC10"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_11
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC11"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_12
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC12"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_13
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC13"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_14
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC14"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_15
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC15"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_16
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC16"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_17
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC17"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_18
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC18"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_19
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC19"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_20
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC20"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_21
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC21"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_22
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC22"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_23
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC23"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_24
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC24"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_25
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC25"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_26
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC26"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_27
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC27"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_28
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC28"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_29
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC29"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_30
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC30"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_31
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC31"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_32
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC32"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_33
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC33"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_34
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC34"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_35
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC35"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_36
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC36"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_37
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC37"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_38
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC38"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_39
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC39"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_40
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC40"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_41
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC41"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_42
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC42"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_43
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC43"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_44
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC44"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_45
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC45"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_46
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC46"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_47
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC47"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_48
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC48"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_49
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC49"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_50
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC50"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_51
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC51"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_52
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC52"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_53
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC53"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_54
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC54"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_55
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC55"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_56
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC56"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_57
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC57"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+    family SIM_58
+        # Identification code of the simulation to be run
+        edit SIM "1997F100D0_AC58"
+        inlimit -n sim_limit
+        family sentinel
+            task t_check_sim_id_consist
+            task t_check_sim_id
+                trigger t_check_sim_id_consist eq complete
+        endfamily
+        family mkdirs
+            trigger sentinel eq complete
+            task t_mkdirs
+        endfamily
+        family mkinputs
+            trigger mkdirs eq complete
+            task t_mklinks
+            task t_mkSTRfile
+                trigger t_mklinks eq complete
+        endfamily
+        family run
+            trigger mkinputs eq complete
+            task t_run_shyfem
+            task t_run_status_0
+                trigger t_run_shyfem eq submitted
+            task t_run_status_1
+                trigger t_run_shyfem eq complete
+        endfamily
+        family spy
+            trigger run/t_run_status_0 eq complete
+            family INF
+                task t_tail_INF_file
+                task t_INF_TS_min_max_plot
+            endfamily
+            family EXT
+                task t_EXT_split_and_plot
+            endfamily
+            family html
+                task t_mkhtml_sim
+                    trigger ../../run/t_run_status_0 eq complete
+                task t_rmhtml_sim
+                    trigger ../EXT eq complete and ../INF eq complete
+            endfamily
+        endfamily
+        family postproc
+            trigger run/t_run_status_1 eq complete
+            family EXT
+                edit FILE2PROC "%SIM%.ext"
+                task t_extsplit
+            endfamily
+            family shy2nc
+                family TS
+                    edit FILE2PROC "%SIM%.ts.shy"
+                    task t_shy2nc
+                endfamily
+                family HYDRO
+                    edit FILE2PROC "%SIM%.hydro.shy"
+                    task t_shy2nc
+                endfamily
+            endfamily
+            family ncEXTsel
+                family TS
+                    trigger ../shy2nc/TS eq complete
+                    edit FILE2PROC "%SIM%.ts.nc"
+                    task t_ncEXTsel
+                endfamily
+                family HYDRO
+                    trigger ../shy2nc/HYDRO eq complete
+                    edit FILE2PROC "%SIM%.hydro.nc"
+                    task t_ncEXTsel
+                endfamily
+            endfamily
+        endfamily
+        family clean
+            trigger spy eq complete and postproc eq complete
+            task t_clean
+        endfamily
+        family archive
+            trigger clean eq complete
+            task t_archive_spy
+            task t_archive_sim
+                trigger t_archive_spy eq complete
+        endfamily
+    endfamily
+
+
+endsuite

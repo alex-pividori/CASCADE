@@ -1,0 +1,62 @@
+#!/bin/bash
+
+#******************************************************************************
+#
+# DESCRIPTION:      This bash script is used to create CSV outputfiles containing
+#                   a series of statistical indicators based on a SHYFEM simulation
+#                   
+#
+# EXTERNAL CALLS:   none.
+#
+# EXTERNAL FILES:  - input NetCDF data file
+#                   
+#              
+#
+# DEVELOPER:         Alex Pividori (alex.pividori@arpa.fvg.it)
+#                    ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#                   "AdriaClim" Interreg IT-HR project
+#
+# SOFTWARE VERSION: Bash
+#                   CDO version 1.9.8
+#
+# CREATION DATE:    15/06/2022
+#
+# MODIFICATIONS:    15/06/2022 --> Transformation into a job
+#
+# VERSION:          0.1.
+#
+#******************************************************************************
+
+#========================= Temperature Version =======================
+
+#PBS -N gr_bm
+#PBS -o stdout_gr
+#PBS -e stderr_gr
+#PBS -P AdriaClim
+#PBS -W umask=0002
+#PBS -q arpa
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=00:30:00
+##PBS -m abe
+##PBS -M alex.pividori@arpa.fvg.it
+#PBS -W block=true
+
+stat_index="%%stat_index%%"
+var="%%var%%"
+
+cd %%tmp_dir_root%%
+
+# module loading
+#module load %%python_module%%        &>/dev/null
+module load %%miniconda_module%%     &>/dev/null
+
+#***********************************
+
+while IFS=';' read node_name  month
+do
+        echo -e "I'm throwing \"boxplot_delta_benchmark.py\" with: var=\"$var\", node_name=\"$node_name\", and stat_index=\"$stat_index\""
+	python  boxplot_delta_benchmark.py  $var $node_name $stat_index
+
+done  < %%init_file%%
+
+echo -e "\n"

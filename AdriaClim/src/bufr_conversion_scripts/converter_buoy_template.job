@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# ******************************************************************************
+#
+#  DESCRIPTION:      this bash job script is used to run two different python
+#                    scripts used to convert data from CSV/MIS to BUFR format.
+#                    buoy_type variable value is necessary to decide which
+#                    script is throwing.   
+#
+#  EXTERNAL CALLS:    - cortek_buoy2csv.py;
+#                     - nke-wimo_buoy2csv.py.
+#
+#  EXTERNAL FILES:   none.
+#                   
+#  DEVELOPER:        Alex Pividori (alex.pividori@arpa.fvg.it)
+#                    ARPA FVG - S.O.C. Stato dell'Ambiente - CRMA
+#
+#  SOFTWARE VERSION:  - Python 3.7.11 (default, Jul 27 2021, 14:32:16) [GCC 7.5.0]
+#                     - eccodes/2.13.0/intel/19.1.1.217-ip7puyk
+#
+#  CREATION DATE:    18/11/2022.
+#
+#  MODIFICATIONS:    18/11/2022 --> Transformation into a job;
+#                    24/11/2022 --> Documentation insert.
+#
+#  VERSION:          0.1.
+#
+# ******************************************************************************
+
+#PBS -N buoy_converter
+#PBS -o stdout_buoy
+#PBS -e stderr_buoy
+#PBS -W umask=0002
+#PBS -q %%queue%%
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=%%wall_time%%
+#PBS -W block=true
+
+cd "%%tmp_dir_root%%" || { echo "ERROR inside \"converter_buoy\" job. I can't move to %%tmp_dir_root%%"; exit; }
+
+#********* Modules loading *********
+
+module load %%eccodes_module%%
+echo "I have just loaded %%eccodes_module%% module"
+module load %%python_module%%
+echo "I have just loaded %%python_module%% module"
+
+buoy_type="%%b_type%%"    # this variable can be nke_wimo or cortek
+buoy="%%buoy%%"           # this is the label of the specific buoy: e.g.
+                          # "RFVGCORON4"  "AFVGBARBAN" for "cortek" buoys and
+                          # "5228" "5229" "522f" for "nke_wimo" buoys
+lat_buoy="%%lat_b%%"      # coordinates fo the "cortek" buoys
+lon_buoy="%%lon_b%%"
+
+cortek_buoy2csv_py="%%cortek_buoy2csv_py%%"
+nke_wimo_buoy2csv_py="%%nke_wimo_buoy2csv_py%%"
+input_dir="%%input_dir%%"
+output_dir="%%output_dir%%"
+path_gpx="%%path_gpx%%"
+
+#===============================================================================================================
+
+if   [[ "${buoy_type}" == "cortek" ]];   then
+
+    echo "The python script for cortek buoys will be launched right now."
+    python "$cortek_buoy2csv_py"  "${input_dir}" "${output_dir}" "$buoy" "$lat_buoy" "$lon_buoy"  \
+            &&  echo -e "\tcortek buoy conversion for \"$buoy\" buoy has been correctly completed." ; 
+    echo "The python script for cortek buoys has finished right now."
+
+elif [[ "${buoy_type}" == "nke_wimo" ]]; then
+
+    echo "The python script for nke_wimo buoys will be launched right now."
+    python "$nke_wimo_buoy2csv_py" "${input_dir}" "${output_dir}" "$buoy" "$path_gpx" \
+            &&  echo -e "\tnke_wimo buoy conversion for \"$buoy\" buoy has been correctly completed." ; 
+    echo "The python script for nke_wimo buoys has finished right now."
+
+else
+    echo "ERROR! Buoy type \"${buoy_type}\" doesn't exist. It has to be \"cortek\" or \"nke_wimo\"."
+fi

@@ -1,0 +1,10 @@
+#
+# Bin intervals: [1.0, 12.0, 15.0, 17.0, 25.0].
+# SS_Aindex: Skill Score between model and reference 'Aindex'. SS_Aindex = ( A - A_ref )/( A_perf - A_ref ).
+# POD: Probability Of Detection.
+#
+Bin_interval;SS_POD
+[1.0,12.0[;-1.625
+[12.0,15.0[;-0.214
+[15.0,17.0[;-0.200
+[17.0,25.0[;-2.967

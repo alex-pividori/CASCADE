@@ -1,0 +1,95 @@
+# ******************************************************************************
+#                                    TASK
+#                   To be used in the frame of "ecFlow" suites
+#            (https://confluence.ecmwf.int/display/ECFLOW/ecflow+home)
+# ******************************************************************************
+#
+#  DESCRIPTION:    The aim of this task is to set the temporary working 
+#                  directory 'tmp_root_dir' and the archiviation 'output_dir'
+#                  starting from the 'output_dir_tpl' directory template.
+#
+#  EXTERNAL CALLS: - None
+#
+#  EXTERNAL FILES: - header managing general calls to "ecFlow" client;
+#                  - Task manual 'set_dir.man';
+#                  - suite general initialisation file 'general.ini';
+#                  - tail managing general calls to "ecFlow" client.
+#
+#  DEVELOPER:      Pividori Alex ( alex.pividori@arpa.fvg.it)
+#                  ARPA FVG - CRMA
+#
+#  CREATION DATE:  2023-05-02
+#
+#  MODIFICATIONS:  none.
+#
+#  VERSION:        0.1.
+#
+# ******************************************************************************
+
+# Include the manual of this task
+%manual
+%include <man/set_dir.man>
+%end
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+# Include a family-specific initialisation file
+%include <etc/general.ini> 
+
+# ============== Bulletin date ==============
+DATEB=$( date -u -d "$bulletin_date_delta" +%%Y%%m%%d )
+
+YYYYB="${DATEB:0:4}"
+MMB="${DATEB:4:2}"
+DDB="${DATEB:6:2}"
+
+# ********** Directories **********
+
+output_dir="${output_dir_tpl//%%year%%/${YYYYB}}"
+output_dir="${output_dir//%%month%%/${MMB}}"
+output_dir="${output_dir//%%day%%/${DDB}}"
+ 
+# ==================================================
+#               Creation of directories
+# ==================================================
+
+rm_var=0
+create_var=0
+
+# =============== Working directory =============
+
+if [      -d "${tmp_root_dir}" ]; then
+    echo  -e "\n\tThe \"${tmp_root_dir}\" directory already exists. It will be deleted and recreated.\n"
+    rm    -r "$tmp_root_dir" || rm_var=1
+    mkdir -p "$tmp_root_dir" || create_var=1
+else
+    mkdir -p "$tmp_root_dir" || create_var=1
+    echo  -e "\n\tThe \"${tmp_root_dir}\" directory has been created.\n"
+fi
+
+# =========== Output root directory =============
+
+if [      -d "${output_dir}" ]; then
+    echo  -e "\n\tThe \"${output_dir}\" directory already exists.\n"
+else
+    mkdir -p "$output_dir" || create_var=1
+    echo  -e "\n\tThe \"${output_dir}\" directory has been created.\n"
+fi
+
+# ==================== Check ====================
+
+EXIT_STATUS=0
+
+if [ $rm_var     -eq  1 ]; then
+    echo -e "\n\tThe \"${tmp_root_dir}\" directory can't be removed completely. Please check.\n"
+    EXIT_STATUS=1
+fi
+
+if [ $create_var -eq  1 ]; then
+    echo -e "\n\tThe \"${tmp_root_dir}\" and/or \"${output_root_dir}\" directory can't be created. Please check permits.\n"
+    EXIT_STATUS=1
+fi
+
+echo -e "\n\tThe task is terminated with EXIT STATUS=${EXIT_STATUS}.\n"
+
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

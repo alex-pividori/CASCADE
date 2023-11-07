@@ -1,0 +1,203 @@
+# ******************************************************************************
+#                                    TASK
+#                   To be used in the frame of "ecFlow" suites
+#            (https://confluence.ecmwf.int/display/ECFLOW/ecflow+home)
+# ******************************************************************************
+#
+#  DESCRIPTION:    this "ecFlow" task is aimed at running a job script, which
+#                  creates a customized GIF, from a PostScript obtained through
+#                  the "shyplot" SHYFEM's tool, applied to a SHY (.shy) file
+#                  for a given time interval, variable and vertical layer, and
+#                  according to a parameter STR file for post processing
+#                  routines (see the EXTERNAL CALLS comment section).
+#
+#  EXTERNAL CALLS: - job template aimed at creating a customized GIF, from a
+#                    PostScript obtained through the "shyplot" SHYFEM's tool,
+#                    applied to a SHY (.shy) file for a given time interval,
+#                    variable and vertical layer, and according to a parameter
+#                    STR file for post processing routines.
+#
+#  EXTERNAL FILES: - header managing general calls to "ecFlow" client;
+#                  - function managing the PBS queue job submission;
+#                  - suite general initialisation file;
+#                  - tail managing general calls to "ecFlow" client.
+#
+#  DEVELOPER:      Alessandro Minigher (alessandro.minigher@arpa.fvg.it)
+#                  ARPA FVG - S.O.C. Osmer e GRN - S.O.S. Qualità dell'aria
+#
+#  CREATION DATE:  2023-04-28.
+#
+#  MODIFICATIONS:  none.
+#
+#  VERSION:        0.1.
+#
+# ******************************************************************************
+
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+# Include the function managing the PBS queue job submission
+%include <qsub_4_bash.h>
+# Include the general initialisation file
+%include <etc/general.ini>
+
+#  --- START OF MAIN ---
+
+# Inform the user about the current directory
+echo -e "Current directory: $(pwd).\n"
+
+# Create the desired directory, if not existent, move into it and inform the
+# user
+if [[ ! -d "${tmp_root_dir}/%VAR2PLOT%" ]]; then mkdir -p "${tmp_root_dir}/%VAR2PLOT%"; fi
+
+echo -e "Change directory: moving to ${tmp_root_dir}/%VAR2PLOT%..."; cd "${tmp_root_dir}/%VAR2PLOT%"
+echo -e "Current directory: $(pwd).\n"
+
+# Define the archive directory, starting from its template
+output_dir="${output_dir_tpl//%%year%%/${CUR_DATE:0:4}}"
+output_dir="${output_dir//%%month%%/${CUR_DATE:5:2}}"
+output_dir="${output_dir//%%day%%/${CUR_DATE:8:2}}"
+
+if [[ ! -d "${output_dir}" ]]; then  mkdir -p "${output_dir}"; echo -e "The directory \"${output_dir}\" has been created.\n"; 
+                               else  echo  -e "The directory \"${output_dir}\" already exists.\n"; fi
+
+# Remove the standard output and error of the job, if already existent
+if [[ -f "$JOB_o_PS2GIF" ]]; then rm "$JOB_o_PS2GIF"; fi
+if [[ -f "$JOB_e_PS2GIF" ]]; then rm "$JOB_e_PS2GIF"; fi
+
+# Define the default status for the submission of the job (OKKO=0 -> all went
+# OK; OKKO=1 -> something went KO)
+OKKO=0
+
+# Define the basename of the job to be run, starting from that of its related
+# template (provided in the initialisation file)
+JOB="${shyfem_ps2gif_job_tpl##*/}"   # consider the basename only
+JOB="${JOB//.tpl/}"                  # remove the ".tpl" extension
+
+# Initialization file to use
+DATE="%ECF_DATE%"
+DATEB=$( date -u -d "$DATE $bulletin_date_delta" +%%Y%%m%%d )
+
+YYYYB="${DATEB:0:4}"
+MMB="${DATEB:4:2}"
+DDB="${DATEB:6:2}"
+
+data_dir="${data_dir_tpl//%%year%%/${YYYYB}}"
+data_dir="${data_dir//%%month%%/${MMB}}"
+data_dir="${data_dir//%%day%%/${DDB}}"
+
+hs_gif_ini="${hs_gif_ini_tpl//%%variable%%/$SHYPLOT_VARNAME}"
+plot_type="%PLOT_TYPE%"
+
+frst_line=( $( sed -n 1p "${data_dir}/temp.3d.1" | sed "s/::/ /g" ) )
+time_b="${frst_line[1]:0:5}"
+
+while IFS=";" read    domain   time_in   time_fin   day_in   day_fin   level
+do
+
+    # ================ File name creation ================
+
+    # remove leading and trailing blank spaces
+    domain="$(    sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${domain}"   )"
+    time_in="$(   sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${time_in}"  )"
+    time_fin="$(  sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${time_fin}" )"
+    day_in="$(    sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${day_in}"   )"
+    day_fin="$(   sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${day_fin}"  )"
+    level="$(     sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//' <<< "${level}"    )"
+
+    SHYPLOT_LAYER=$level
+
+    # format: YYYY-MM-DD::hh:mm:ss
+    SHYPLOT_TMIN="$( date -ud "$DATEB $time_in  ${day_in}day"  "+%%Y-%%m-%%d::%%H:%%M:%%S" )"
+    SHYPLOT_TMAX="$( date -ud "$DATEB $time_fin ${day_fin}day" "+%%Y-%%m-%%d::%%H:%%M:%%S" )"
+
+    echo -e "\n Domain: $domain\n time_in:$time_in\n time_fin:$time_fin\n day_in: $day_in\n day_fin:$day_fin\n level:$level\n SHYPLOT_TMIN: $SHYPLOT_TMIN\n SHYPLOT_TMAX: $SHYPLOT_TMAX"
+    
+    echo "The GIF_IMG (gif file name) will be created right now."
+
+    case $domain in 
+    "SHYFEM_domain")
+    domain_label="GOTMGL";;
+    "lagoon_domain")
+    domain_label="MGL";;
+    "got_domain")
+    domain_label="GOT";;
+    *)
+    echo "gif animation domain not found"; continue ;;
+    esac
+   
+
+    SHYPLOT_APNSTRFILE="${SHYPLOT_APNSTRFILE_tpl//%%domain%%/$domain_label}"
+   
+    GIF_IMG="$( ${script_root_dir}/${encoding_file_name_script}          $plot_type           $domain             $conf_script_dir          $d1_L_table               \
+                                                                         $d2_L_table_tpl      $d345_L_table_tpl   $d12345_V_table           $d1_E_table               \
+                                                                         $time_b              $DATEB              $time_in                  $time_fin                 \
+                                                                         $day_in              $day_fin            $code_field_length        $graph_file_name_out_tpl  \
+                                                                         'XX'                 $t_steps_multi_TS   'gif'                     $level  )"
+
+    echo "The GIF_IMG for $plot_type plot type is: \"$GIF_IMG\"."
+    echo "SHYPLOT_APNSTRFILE: $SHYPLOT_APNSTRFILE"    
+
+    # Create the job to be run, starting from its related template, by the use of a
+    # "sedfile"
+    SEDFILE="$(mktemp -u ./sedfile.XXXXX)"
+cat <<EOF > "$SEDFILE"
+        s/%%%%JOB_P%%%%/$JOB_P_PS2GIF/g
+        s/%%%%JOB_W_umask%%%%/$JOB_W_umask_PS2GIF/g
+        s/%%%%JOB_W_block%%%%/$JOB_W_block_PS2GIF/g
+        s/%%%%JOB_N%%%%/$JOB_N_PS2GIF/g
+        s/%%%%JOB_o%%%%/$JOB_o_PS2GIF/g
+        s/%%%%JOB_e%%%%/$JOB_e_PS2GIF/g
+        s/%%%%JOB_q%%%%/$JOB_q_PS2GIF/g
+        s/%%%%JOB_l_nodes%%%%/$JOB_l_nodes_PS2GIF/g
+        s/%%%%JOB_l_ppn%%%%/$JOB_l_ppn_PS2GIF/g
+        s/%%%%JOB_l_walltime%%%%/$JOB_l_walltime_PS2GIF/g
+        s/%%%%SHY_MOD%%%%/${shyfem_module//\//\\/}/g
+        s/%%%%SHYPLOT_TMIN%%%%/$SHYPLOT_TMIN/g
+        s/%%%%SHYPLOT_TMAX%%%%/$SHYPLOT_TMAX/g
+        s/%%%%SHYPLOT_VARNAME%%%%/$SHYPLOT_VARNAME/g
+        s/%%%%SHYPLOT_LAYER%%%%/$SHYPLOT_LAYER/g
+        s/%%%%CONVERT_DELAY%%%%/$CONVERT_DELAY/g
+        s/%%%%GIF_IMG%%%%/$GIF_IMG/g
+        s/%%%%SHYPLOT_FILE2PLOT%%%%/${SHYPLOT_FILE2PLOT//\//\\/}/g
+        s/%%%%SHYPLOT_APNSTRFILE%%%%/${SHYPLOT_APNSTRFILE//\//\\/}/g
+        s/%%%%SHYPLOT_APNSTRFILE_COLORMAP%%%%/${SHYPLOT_APNSTRFILE_COLORMAP//\//\\/}/g
+        s/%%%%GIF_ARCH_DIR%%%%/${output_dir//\//\\/}/g
+EOF
+    sed -f "$SEDFILE" "$shyfem_ps2gif_job_tpl" > "$JOB"
+
+    # Check the outcome of the creation of the job and if the job itself exists:
+    #  - if all went OK and the job exists
+    if [[ $? -eq 0 ]] && [[ -f "$JOB" ]]; then
+        # Inform the user
+        echo -e "Job: ${JOB} successfully created."
+    #  - if something went KO or the job does not exist
+    else
+        # Inform the user and abort
+        echo -e "Job: ${JOB} unsuccessfully created. Please check."
+    fi
+
+    # Submit the job to HPC queues
+    ecflow_qsub "$JOB" || OKKO=1
+
+    # Check the outcome of the submission:
+    #  - if all went OK
+    if [[ $OKKO -eq 0 ]]; then
+        # Inform the user
+        echo -e "Job: ${JOB} successfully run.\n"
+    #  - if something went KO
+    else
+        # Inform the user
+        echo -e "Job: ${JOB} unsuccessfully run. Please check.\n"
+    fi
+
+    # If the job exists, remove it
+    if [[ -f "$JOB" ]]; then rm -v "$JOB" | sed -e s/^/\\t/g ; fi
+    # If the "sedfile" exists, remove it
+    if [[ -f "$SEDFILE" ]]; then rm -v "$SEDFILE" | sed -e s/^/\\t/g ; fi
+
+    #  --- END OF MAIN ---
+
+done < "${conf_script_dir}/${hs_gif_ini}"
+
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

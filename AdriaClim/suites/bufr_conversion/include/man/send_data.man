@@ -1,0 +1,22 @@
+#====================================================================
+#                         send_data.ecf MANUAL
+#====================================================================
+
+The 'send_data.ecf' is a task of a separate family. This second family 
+is launched only once a week. The main aim of this task is to collect the 
+entire data files of the previous week and send them via email in a single 
+csv format file.
+
+There are some parameters inside the initialization file that can be 
+useful to set important features about the sending process. 
+
+The "sd_modality" boolean variable activates or deactivates the sending 
+process by its 'on' or 'off' value. 
+
+The "zip_modality" boolean variable turns on (or off) the compressing
+process figured out by a zip process. It is also possible to choose 
+the separator desired for the output csv format file. 
+
+Even in this task (like in 'warnings_errors_check' task ) there is 
+the possibility to change the recipient of the mail and the buoys labels 
+you want to send the collected data. 

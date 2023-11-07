@@ -1,0 +1,331 @@
+# Include the manual of this task
+%manual
+%include <man/launcher_buoy_converter.man>
+%end
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+# Include the function managing the PBS queue job submission
+%include <qsub_4_bash.h>
+# Include a family-specific initialisation file
+%include <etc/%SUITE%.ini>
+
+# ====================== Conversion on/off fork =========================
+
+if   [[ "${conversion_modality}" == "off" ]]; then
+
+    echo -e "\tThe 'conversion_modality' varibale in 'bufr_conversion.ini' initialization file is set to \"off\". The BUFR conversion process won't be performed."
+    ecflow_client --complete
+
+elif [[ "${conversion_modality}" == "on"  ]]; then
+
+    echo -e "\tThe 'conversion_modality' varibale in 'bufr_conversion.ini' initialization file is set to \"on\". The BUFR conversion process will be performed."
+
+    # ========================================================================
+    #                        Buoy raw data conversion
+    # ========================================================================
+    
+    cd "$tmp_dir_root" && echo -e "\n\tNow I'm in the \"${tmp_dir_root}\" directory.\n" || { echo -e "\n\tI can't change directory to \$tmp_dir_root: \"$tmp_dir_root\"\n" ; ERROR ; }
+    
+    # The conversion process must start at least two days ago (for technical
+    # data-recording reasons). The conversion process continues backwards until
+    # \$day_range days ago to convert potential data transmission dalays happened
+    # in past days. In case the n-th past day has already been converted, the cycle
+    # continues unchanged
+    echo -e "\n\tThe conversion process will cover a $day_range days period:"
+    echo -e "\t - from $(date -d "-$(( day_range + start_day     ))day" +"%%Y-%%m-%%d") to $(date -d "-$(( start_day + 1 ))day" +"%%Y-%%m-%%d") for cortek buoys (extremes included);"
+    echo -e "\t - from $(date -d "-$(( day_range + start_day + 1 ))day" +"%%Y-%%m-%%d") to $(date -d "-$(( start_day + 2 ))day" +"%%Y-%%m-%%d") for nke_wimo buoys (extremes included).\n"
+    
+    for day_shift in $( seq $start_day $(( day_range + start_day - 1 )) ) 
+    do
+    
+        # Useful set of dates needed for the conversion process
+        # =================== Reference date =====================
+        year=`        date -d "-${day_shift}day"          +"%%Y"`
+        month=`       date -d "-${day_shift}day"          +"%%m"`
+        day=`         date -d "-${day_shift}day"          +"%%d"`
+        #  === Year (YYYY) and month (MM) previous (-1 Month) ===
+        #      respect to the "${year}${month}" date
+        year_prv=$(  date -d "$year-$month-$day  -1month" +"%%Y" )
+        month_prv=$( date -d "$year-$month-$day  -1month" +"%%m" )
+        # ==================== Date +1 day =======================
+        year_p=`      date -d "$year-$month-$day  +1day"  +"%%Y"`
+        month_p=`     date -d "$year-$month-$day  +1day"  +"%%m"`
+        day_p=`       date -d "$year-$month-$day  +1day"  +"%%d"`
+        # =========== cortek Analysis date ( yesterday ) =========
+        year_al=`     date -d "$year-$month-$day  -1day"  +"%%Y"`
+        month_al=`    date -d "$year-$month-$day  -1day"  +"%%m"`
+        day_al=`      date -d "$year-$month-$day  -1day"  +"%%d"`
+        # == nke-wimo Analysis date ( the day before yesterday ) =
+        year_al_n=`   date -d "$year-$month-$day  -2day"  +"%%Y"`
+        month_al_n=`  date -d "$year-$month-$day  -2day"  +"%%m"`
+        day_al_n=`    date -d "$year-$month-$day  -2day"  +"%%d"`
+        # ========== functional date for nke_wimo buoys ==========
+        year_al_n1=`  date -d "$year-$month-$day  -3day"  +"%%Y"`
+        month_al_n1=` date -d "$year-$month-$day  -3day"  +"%%m"`
+        day_al_n1=`   date -d "$year-$month-$day  -3day"  +"%%d"`
+        # ================== Input directories ===================
+        cortek_input_dir="${cortek_input_dir_tpl//%%year%%/${year}}"
+        cortek_input_dir="${cortek_input_dir//%%month%%/${month}}"
+        cortek_input_dir="${cortek_input_dir//%%day%%/${day}}"
+        nke_wimo_input_dir="${nke_wimo_input_dir_tpl//%%year%%/${year}}"
+        nke_wimo_input_dir="${nke_wimo_input_dir//%%month%%/${month}}"
+        nke_wimo_input_dir="${nke_wimo_input_dir//%%day%%/${day}}"
+        # ========= Input directories (previous month) ==========
+        cortek_input_dir_prv="${cortek_input_dir_tpl//%%year%%/${year_prv}}"
+        cortek_input_dir_prv="${cortek_input_dir_prv//%%month%%/${month_prv}}"
+        cortek_input_dir_prv="${cortek_input_dir_prv//%%day%%/??}"
+        nke_wimo_input_dir_prv="${nke_wimo_input_dir_tpl//%%year%%/${year_prv}}"
+        nke_wimo_input_dir_prv="${nke_wimo_input_dir_prv//%%month%%/${month_prv}}"
+        nke_wimo_input_dir_prv="${nke_wimo_input_dir_prv//%%day%%/??}"
+        # ======== Complementary Input directory (cortek) ========
+        cortek_path_p="${cortek_path_p_tpl//%%year_p%%/${year_p}}"
+        cortek_path_p="${cortek_path_p//%%month_p%%/${month_p}}"
+        cortek_path_p="${cortek_path_p//%%day_p%%/${day_p}}"
+        # ======== Output directories (BUFR files storage) =======
+        cortek_output_dir="${cortek_output_dir_tpl//%%year_al%%/${year_al}}"
+        cortek_output_dir="${cortek_output_dir//%%month_al%%/${month_al}}"
+        cortek_output_dir="${cortek_output_dir//%%day_al%%/${day_al}}"
+        nke_wimo_output_dir="${nke_wimo_output_dir_tpl//%%year_al_n%%/${year_al_n}}"
+        nke_wimo_output_dir="${nke_wimo_output_dir//%%month_al_n%%/${month_al_n}}"
+        nke_wimo_output_dir="${nke_wimo_output_dir//%%day_al_n%%/${day_al_n}}"
+    
+        # =========================================================================
+    
+        # The buoy_types array contains "cortek" and/or "nke_wimo", e.g.
+        # buoy_types=( "cortek" "nke_wimo" )
+        for b_type in ${buoy_types[@]}
+        do
+    
+            case $b_type in
+    
+            # ============================
+            #           Cortek
+            # ============================
+    
+            "cortek")
+    
+            # ********************************************
+    
+            for buoy in ${buoy_names_cortek[@]}     # prefix buoy types
+            do
+    
+                # Build the name (full path) of the BUFR file, starting from its
+                # template
+                cortek_output_file="${cortek_output_file_tpl//%%cortek_output_dir%%/${cortek_output_dir}}"
+                cortek_output_file="${cortek_output_file//%%buoy%%/${buoy}}"
+                cortek_output_file="${cortek_output_file//%%year_al%%/${year_al}}"
+                cortek_output_file="${cortek_output_file//%%month_al%%/${month_al}}"
+                cortek_output_file="${cortek_output_file//%%day_al%%/${day_al}}"
+                # Check existence and nonzero size of the BUFR file
+                if [[ -s "$cortek_output_file" ]]; then 
+                    echo -e "\n\tThe data conversion for \"${cortek_output_file}\" has already been performed.\n"
+                    continue
+                else
+                    echo -e "\n\tThe data conversion for \"${cortek_output_file}\" is starting.\n"
+                fi
+    
+                # ===
+                dir2find="${cortek_input_dir::-2}[0-3][0-9]"
+                # ===
+                dir2find_prv="${cortek_input_dir_prv::-2}[0-3][0-9]"
+                # ===
+                file2find="${cortek_input_file_tpl//%%buoy%%/${buoy}}"
+                file2find="${file2find//%%year%%/${year}}"
+                file2find="${file2find//%%month%%/${month}}"
+                file2find="${file2find//%%day%%/${day}}"
+                # ===
+                file2find_al="${cortek_input_file_tpl//%%buoy%%/${buoy}}"
+                file2find_al="${file2find_al//%%year%%/${year_al}}"
+                file2find_al="${file2find_al//%%month%%/${month_al}}"
+                file2find_al="${file2find_al//%%day%%/${day_al}}"
+                # ===
+                file2find_al_n="${cortek_input_file_tpl//%%buoy%%/${buoy}}"
+                file2find_al_n="${file2find_al_n//%%year%%/${year_al_n}}"
+                file2find_al_n="${file2find_al_n//%%month%%/${month_al_n}}"
+                file2find_al_n="${file2find_al_n//%%day%%/${day_al_n}}"
+    
+                files_str=`find ${dir2find}                                                                                \
+                                ${dir2find_prv}  -type f -size +0c                                                         \
+                         -name "${file2find}"        -printf "%%f:%%p\n"                                                   \
+                      -o -name "${file2find_al}"     -printf "%%f:%%p\n"                                                   \
+                      -o -name "${file2find_al_n}"   -printf "%%f:%%p\n"  | sort | awk -F: '!seen[$1]++ {print $2}' `
+    
+                # $list_files contains also the file path, not only the file name
+                list_files=( $files_str )
+            
+                # Unique file containing raw buoy data (please do not change the
+                # name of this file)
+                cortek_data_row="cortek_data_row.txt"
+                converter_buoy_job="converter_buoy.job"
+    
+                if [[ ${#list_files[@]} -gt 0 ]]; then 
+    
+                    cat "${list_files[@]}" > "$cortek_data_row"
+    
+                    if [[ ! -d "$cortek_output_dir" ]]; then
+                        mkdir -p "$cortek_output_dir" && echo -e "\n\tThe directory \"${cortek_output_dir}\" has been created.\n"
+                    fi
+            
+                    sed -e "s/%%%%tmp_dir_root%%%%/${tmp_dir_root//\//\\/}/g"             \
+                        -e "s/%%%%input_dir%%%%/${cortek_input_dir//\//\\/}/g"            \
+                        -e "s/%%%%output_dir%%%%/${cortek_output_dir//\//\\/}/g"          \
+                        -e "s/%%%%cortek_buoy2csv_py%%%%/${cortek_buoy2csv_py//\//\\/}/g" \
+                        -e "s/%%%%b_type%%%%/${b_type}/g"                                 \
+                        -e "s/%%%%buoy%%%%/${buoy}/g"                                     \
+                        -e "s/%%%%python_module%%%%/${python_module//\//\\/}/g"           \
+                        -e "s/%%%%eccodes_module%%%%/${eccodes_module//\//\\/}/g"         \
+                        -e "s/%%%%queue%%%%/${queue}/g"                                   \
+                        -e "s/%%%%wall_time%%%%/${wall_time}/g"                           \
+                        -e "s/%%%%lat_b%%%%/${lat_b[${buoy}]}/g"                          \
+                        -e "s/%%%%lon_b%%%%/${lon_b[${buoy}]}/g"         "$converter_buoy_template_job" > "$converter_buoy_job"
+    
+                    echo -e "\n\tThe \"${converter_buoy_job}\" for \"${buoy}\" ${b_type} buoy will be launched right now.\n"
+                    ecflow_qsub "$converter_buoy_job" 
+                    echo -e "\n\tThe \"${converter_buoy_job}\" for \"${buoy}\" ${b_type} buoy has finished.\n"
+    
+                    rm      "$cortek_data_row"   "$converter_buoy_job" || { echo -e "\n\tI can't remove ${cortek_data_row} and/or ${converter_buoy_job}.\n"; exit; }
+                    echo -e "\tConversion for \"${buoy}\" \"${b_type}\" buoy is completed.\n"
+                else
+                    echo -e "\tThere is no data for \"${buoy}\" ${b_type} buoy in ${year_al}-${month_al}-${day_al}. The conversion can't be performed.\n"
+                fi
+    
+                unset list_files files_str
+    
+            done
+            ;;
+    
+            # ============================
+            #          nke_wimo
+            # ============================
+    
+            "nke_wimo")
+    
+            # ******************************************
+    
+            for buoy in ${buoy_names_nke_wimo[@]}     # prefix buoy types
+            do
+    
+                # Build the name (full path) of the BUFR file, starting from its
+                # template
+                nke_wimo_output_file="${nke_wimo_output_file_tpl//%%nke_wimo_output_dir%%/${nke_wimo_output_dir}}"
+                nke_wimo_output_file="${nke_wimo_output_file//%%buoy%%/${buoy}}"
+                nke_wimo_output_file="${nke_wimo_output_file//%%year_al_n%%/${year_al_n:2:2}}"
+                nke_wimo_output_file="${nke_wimo_output_file//%%month_al_n%%/${month_al_n}}"
+                nke_wimo_output_file="${nke_wimo_output_file//%%day_al_n%%/${day_al_n}}"
+                # Check existence and nonzero size of the BUFR file
+                if [[ -s "$nke_wimo_output_file" ]]; then
+                    echo -e "\n\tThe data conversion for \"${nke_wimo_output_file}\" has already been performed.\n"
+                    continue
+                else
+                    echo -e "\n\tThe data conversion for \"${nke_wimo_output_file}\" is starting.\n"
+                fi
+     
+                # ===
+                dir2find="${nke_wimo_input_dir::-2}[0-3][0-9]"
+                # ===
+                dir2find_prv="${nke_wimo_input_dir_prv::-2}[0-3][0-9]"
+                # ===
+                file2find_al_n="${nke_wimo_input_file_tpl//%%buoy%%/${buoy}}"
+                file2find_al_n="${file2find_al_n//%%year%%/${year_al_n:2:2}}"
+                file2find_al_n="${file2find_al_n//%%month%%/${month_al_n}}"
+                file2find_al_n="${file2find_al_n//%%day%%/${day_al_n}}"
+                # ===
+                file2find_al_n1="${nke_wimo_input_file_tpl//%%buoy%%/${buoy}}"
+                file2find_al_n1="${file2find_al_n1//%%year%%/${year_al_n1:2:2}}"
+                file2find_al_n1="${file2find_al_n1//%%month%%/${month_al_n1}}"
+                file2find_al_n1="${file2find_al_n1//%%day%%/${day_al_n1}}"
+    
+                files_str=`find ${dir2find}                                                                                \
+                                ${dir2find_prv}  -type f -size +0c                                                         \
+                         -name "${file2find_al_n}"       -printf "%%f:%%p\n"                                               \
+                      -o -name "${file2find_al_n1}"      -printf "%%f:%%p\n" | sort | awk -F: '!seen[$1]++ {print $2}' `
+    
+                # ===
+                gps_file="${nke_wimo_gps_input_file_tpl//%%buoy%%/${buoy}}"
+                gps_file="${gps_file//%%year%%/${year_al_n:2:2}}"
+                gps_file="${gps_file//%%month%%/${month_al_n}}"
+                gps_file="${gps_file//%%day%%/${day_al_n}}"
+    
+                path_gpx=`find  ${dir2find}                               \
+                                ${dir2find_prv}  -type f -size +0c        \
+                         -name "${gps_file}" | head -n 1 `
+    
+                # $list_files contains also the file path, not only the file name
+                list_files=( $files_str )
+         
+                if [[ ${#list_files[@]} -eq 0 ]]; then 
+                    echo -e "\tThere is no data for \"${buoy}\" ${b_type} buoy in ${year_al_n}-${month_al_n}-${day_al_n}.\n"
+                    unset   path_gpx
+                    continue
+                fi
+           
+                if [[ -z  "$path_gpx" ]]; then
+                    echo -e "\n\tWARNING: \"${gps_file}\" file not found. Lat/Lon coordinates are not available."
+                    echo -e "The lon/lat variables won't be encoded in the current BUFR file."
+                    path_gpx="NA_gps_var"
+                fi
+    
+                # Unique file containing raw buoy data (please do not change the
+                # name of this file)
+                nke_data_row="nke_data_row.txt"
+                converter_buoy_job="converter_buoy.job"
+                cat "${list_files[@]}" | grep "${year_al_n}-${month_al_n}-${day_al_n} [0-9][0-9]" | sort > "$nke_data_row"  
+        
+                if [[ $( wc -l "${nke_data_row}" | tr -d [:alpha:] | tr -d "_. " ) -gt 0 ]]; then     # more than 0 file
+    
+                    if [[ !   -d "$nke_wimo_output_dir" ]]; then
+                        mkdir -p "$nke_wimo_output_dir" && echo -e "\n\tThe directory \"${nke_wimo_output_dir}\" has been created.\n"
+                    fi                
+    
+                    sed -e "s/%%%%tmp_dir_root%%%%/${tmp_dir_root//\//\\/}/g"                 \
+                        -e "s/%%%%input_dir%%%%/${nke_wimo_input_dir//\//\\/}/g"              \
+                        -e "s/%%%%output_dir%%%%/${nke_wimo_output_dir//\//\\/}/g"            \
+                        -e "s/%%%%path_gpx%%%%/${path_gpx//\//\\/}/g"                         \
+                        -e "s/%%%%nke_wimo_buoy2csv_py%%%%/${nke_wimo_buoy2csv_py//\//\\/}/g" \
+                        -e "s/%%%%b_type%%%%/${b_type}/g"                                     \
+                        -e "s/%%%%buoy%%%%/${buoy}/g"                                         \
+                        -e "s/%%%%python_module%%%%/${python_module//\//\\/}/g"               \
+                        -e "s/%%%%eccodes_module%%%%/${eccodes_module//\//\\/}/g"             \
+                        -e "s/%%%%queue%%%%/${queue}/g"                                       \
+                        -e "s/%%%%wall_time%%%%/${wall_time}/g"     "$converter_buoy_template_job" > "$converter_buoy_job"
+    
+                    echo -e "\n\tThe \"${converter_buoy_job}\" for \"${buoy}\" ${b_type} buoy will be launched right now.\n"
+                    ecflow_qsub "$converter_buoy_job"
+                    echo -e "\n\tThe \"${converter_buoy_job}\" for \"${buoy}\" ${b_type} buoy has finished.\n"
+    
+                    rm  "$nke_data_row" "$converter_buoy_job";  echo -e "\tConversion for \"${buoy}\" ${b_type} buoy is completed.\n";
+                else
+                    echo -e "\tThere is no data for \"${buoy}\" ${b_type} buoy in ${year_al_n}-${month_al_n}-${day_al_n} date. The conversion can't be performed.\n"
+                fi
+    
+                unset list_files
+    
+            done
+            ;;
+    
+            # ============================
+            #             else
+            # ============================
+    
+            *)
+    
+            echo -e "\n\tWARNING: \"${b_type}\" buoy type not supported. Please insert \"nke_wimo\" or \"cortek\".\n"
+            ;;
+    
+            esac
+    
+        done # end of buoy types cycle
+    
+        echo -e "\n\tThe data conversion/conversion attempt from MIS/CSV to BUFR is finished for:"
+        echo -e "\t - ${year_al}/${year_al}${month_al}${day_al}, cortek buoy;"
+        echo -e "\t - ${year_al_n}/${year_al_n}${month_al_n}${day_al_n}, nke_wimo buoy.\n"
+    
+    done # end of back-days cycle 
+
+else   
+    echo -e "WARNING: The 'conversion_modality': \"${conversion_modality}\" value is not available. It has to be 'on' or 'off'."
+fi
+
+echo -e "\t\nThe \"launcher_buoy_converter.ecf\" task is completed.\n"
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

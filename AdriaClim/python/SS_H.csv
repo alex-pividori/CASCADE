@@ -1,0 +1,7 @@
+#
+# Bin intervals: [1.0, 12.0, 15.0, 17.0, 25.0].
+# SS_Aindex: Skill Score between model and reference 'Aindex'. SS_Aindex = ( A - A_ref )/( A_perf - A_ref ).
+# H: Hit rate or the proportion correct.
+#
+SS_H
+-0.722

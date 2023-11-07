@@ -1,0 +1,52 @@
+# Include the manual of this task
+%manual
+%include <man/set_dir.man>
+%end
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+# Include a family-specific initialisation file
+%include <etc/%SUITE%.ini> 
+ 
+# ==================================================
+#               Creation of directories
+# ==================================================
+
+rm_var=0
+create_var=0
+
+# =============== Working directory =============
+
+if [      -d "$tmp_dir_root" ]; then
+    rm    -r "$tmp_dir_root" || rm_var=1
+    mkdir -p "$tmp_dir_root" || create_var=1
+else
+    mkdir -p "$tmp_dir_root" || create_var=1
+fi
+
+# =========== Output root directory =============
+
+if [      -d "$output_root_dir" ]; then
+    echo  -e "\n\tThe \"${output_root_dir}\" directory already exists.\n"
+else
+    mkdir -p "$output_root_dir" || create_var=1
+    echo  -e "\n\tThe \"${output_root_dir}\" directory has been created.\n"
+fi
+
+# ==================== Check ====================
+
+EXIT_STATUS=0
+
+if [ $rm_var -eq 1 ] ; then
+    echo -e "\n\tThe \"${tmp_dir_root}\" directory can't be removed completely. Please check.\n"
+    EXIT_STATUS=1
+fi
+
+if [ $create_var -eq 1 ] ; then
+    echo -e "\n\tThe \"${tmp_dir_root}\" and/or \"${output_root_dir}\" directory can't be created. Please check.\n"
+    EXIT_STATUS=1
+fi
+
+echo -e "\n\tThe task is terminated with EXIT STATUS=${EXIT_STATUS}.\n"
+
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

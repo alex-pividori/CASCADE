@@ -1,0 +1,15 @@
+#
+# Pearson: Pearson correlation coefficient.
+# Spearman: Spearman's rank correlation coefficient.
+# Kendall_tau: Kendall rank correlation coefficient. tau_b formula is used by default.
+# Spearman: Spearman's rank correlation coefficient.
+# bias: Bias among means.
+# MAE: Mean Absolute Error.
+# MSE: Mean Squared Error.
+# RMSE: Root Mean Squared Error.
+# LEPS: Linear Error in Probability Space.
+# SS_Aindex: Skill Score between model and reference 'Aindexe'. SS_Aindex = ( A - A_ref )/( A_perf - A_ref ).
+#
+Pearson;Spearman;Kendall_tau;bias;MAE;MSE;RMSE;LEPS;SS_Pearson;SS_Spearman;SS_Ktau;SS_bias;SS_MAE;SS_MSE;SS_RMSE
+-0.100;-0.096;-0.068;-0.379;3.073;14.899;3.860;-0.409;-4.814;-4.445;-2.614;1.435;-0.910;-2.003;-0.733
+-0.100;-0.096;-0.068;-0.379;3.073;14.899;3.860;-0.409;-4.814;-4.445;-2.614;1.435;-0.910;-2.003;-0.733

@@ -1,0 +1,17 @@
+#==================================================
+#                   set_dir manual
+#==================================================
+
+This is the manual of the "set_dir" task included in
+the "buoy_bufr_conversion" family inside "bufr_conversion" suite. 
+This task is used to check out the existence, create or copy
+some essential directories. 
+These directories are:
+
+- tmp_dir_root:    The working directory of the suite
+- output_root_dir: The root output directory
+- script_dir_root: The holding directory for the entire 
+                   set of scripts used inside the suite
+
+The path of these three directories is present in 
+the "general.ini" initialization file.

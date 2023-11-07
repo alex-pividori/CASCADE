@@ -1,0 +1,12 @@
+#===============================================
+#====       remove_all_tmp_dir MANUAL       ====
+#===============================================
+
+This is the last task of the bufr_conversion suite.
+The only aim of this tast is to remove the working_directory
+used for the suite process. The path of this dir is
+memorized in general.ini as tmp_dir_root.
+
+The task code has been copied from a previous version 
+of others similar suites. Take a look at "/analysis" 
+suite.

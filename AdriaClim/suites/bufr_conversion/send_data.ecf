@@ -1,0 +1,225 @@
+# Include the manual of this task
+%manual
+%include <man/send_data.man>
+%end
+# Include header common to all tasks, managing general calls to "ecFlow" client
+%include <head_4_bash.h>
+# Include a family-specific initialisation file
+%include <etc/%SUITE%.ini>
+
+if   [[ "${sd_modality}" == "off" ]]; then 
+
+    echo -e "\tThe 'sd_modality' is set to \"off\". The send data won't be performed"; 
+    ecflow_client --complete 
+
+elif [[ "${sd_modality}" == "on"  ]]; then 
+
+    echo -e "\tThe 'sd_modality' is set to \"on\". The send data will be performed"; 
+    
+    # ========================================================================
+    #                        Buoy data warning/error check
+    # ========================================================================
+    
+    cd "$tmp_dir_root" && echo -e "\n\tNow I'm in the \"${tmp_dir_root}\" directory.\n" || { echo -e "\n\tI can't change directory to \$tmp_dir_root: \"$tmp_dir_root\"\n" ; ERROR ; }
+    
+    # The sending data process must start at least 1 day ago (for technical
+    # data-recording reasons). The conversion process continues backwards until
+    # \$day_range_check_check days ago to convert potential data transmission dalays happened
+    # in past days. In case the n-th past day has already been converted, the cycle
+    # continues unchanged
+    
+    echo -e  "\n\tThe data send will cover a $day_range_send days period:"
+    echo -ne "\t - from $(date -d "-$(( day_range_send + start_day_send - 1 ))day" +"%%Y-%%m-%%d") to $(date -d "-${start_day_send}day" +"%%Y-%%m-%%d") "
+    echo -e  " for nke_wimo buoys (extremes included).\n"
+    
+    # ============================
+    #          nke_wimo
+    # ============================ 
+
+    # ========================= date now ========================   
+    year_now=`  date   +"%%Y"`
+    month_now=` date   +"%%m"`
+    day_now=`   date   +"%%d"`
+
+    # ========================= date in =========================
+    year_in=`   date -d "-$(( day_range_send + start_day_send - 1 ))day"  +"%%Y"`
+    month_in=`  date -d "-$(( day_range_send + start_day_send - 1 ))day"  +"%%m"`
+    day_in=`    date -d "-$(( day_range_send + start_day_send - 1 ))day"  +"%%d"`
+    
+    # ========================= date fin =========================
+    year_fin=`  date -d "-${start_day_send}day"  +"%%Y"`
+    month_fin=` date -d "-${start_day_send}day"  +"%%m"`
+    day_fin=`   date -d "-${start_day_send}day"  +"%%d"`
+    
+    
+    for buoy in ${sd_buoy_names_nke_wimo[@]}     # prefix buoy types
+    do
+    
+        n_d=1
+    
+        # ============================== File data name ===================================
+        nke_wimo_send_file="${nke_wimo_send_file_tpl//%%buoy%%/${buoy}}"
+    
+        nke_wimo_send_file="${nke_wimo_send_file//%%year_in%%/${year_in}}"
+        nke_wimo_send_file="${nke_wimo_send_file//%%month_in%%/${month_in}}"
+        nke_wimo_send_file="${nke_wimo_send_file//%%day_in%%/${day_in}}"
+    
+        nke_wimo_send_file="${nke_wimo_send_file//%%year_fin%%/${year_fin}}"
+        nke_wimo_send_file="${nke_wimo_send_file//%%month_fin%%/${month_fin}}"
+        nke_wimo_send_file="${nke_wimo_send_file//%%day_fin%%/${day_fin}}"
+    
+        nke_wimo_send_file_zip="${nke_wimo_send_file//csv/zip}"
+    
+        # =================================================================================
+    
+        for day_shift in $( seq  $(( day_range_send + start_day_send - 1 )) -1 $start_day_send ) 
+        do
+    
+            # Useful set of dates needed for the conversion process
+            # =================== Reference date =====================
+            year=`        date -d "-${day_shift}day"          +"%%Y"`
+            month=`       date -d "-${day_shift}day"          +"%%m"`
+            day=`         date -d "-${day_shift}day"          +"%%d"`
+            #  === Year (YYYY) and month (MM) previous (-1 Month) ===
+            #      respect to the "${year}${month}" date
+            year_prv=$(   date -d "$year-$month-$day  -1month" +"%%Y" )
+            month_prv=$(  date -d "$year-$month-$day  -1month" +"%%m" )
+            # ==================== Date +1 day =======================
+            year_p=`      date -d "$year-$month-$day  +1day"  +"%%Y"`
+            month_p=`     date -d "$year-$month-$day  +1day"  +"%%m"`
+            day_p=`       date -d "$year-$month-$day  +1day"  +"%%d"`
+            # =========== cortek Analysis date ( yesterday ) =========
+            year_al=`     date -d "$year-$month-$day  -1day"  +"%%Y"`
+            month_al=`    date -d "$year-$month-$day  -1day"  +"%%m"`
+            day_al=`      date -d "$year-$month-$day  -1day"  +"%%d"`
+            # == nke-wimo Analysis date ( the day before yesterday ) =
+            year_al_n=`   date -d "$year-$month-$day  -2day"  +"%%Y"`
+            month_al_n=`  date -d "$year-$month-$day  -2day"  +"%%m"`
+            day_al_n=`    date -d "$year-$month-$day  -2day"  +"%%d"`
+            # ========== functional date for nke_wimo buoys ==========
+            year_al_n1=`  date -d "$year-$month-$day  -3day"  +"%%Y"`
+            month_al_n1=` date -d "$year-$month-$day  -3day"  +"%%m"`
+            day_al_n1=`   date -d "$year-$month-$day  -3day"  +"%%d"`
+            # ================== Input directories ===================
+            nke_wimo_input_dir="${nke_wimo_input_dir_tpl//%%year%%/${year}}"
+            nke_wimo_input_dir="${nke_wimo_input_dir//%%month%%/${month}}"
+            nke_wimo_input_dir="${nke_wimo_input_dir//%%day%%/${day}}"
+            # ========= Input directories (previous month) ===========
+            nke_wimo_input_dir_prv="${nke_wimo_input_dir_tpl//%%year%%/${year_prv}}"
+            nke_wimo_input_dir_prv="${nke_wimo_input_dir_prv//%%month%%/${month_prv}}"
+            nke_wimo_input_dir_prv="${nke_wimo_input_dir_prv//%%day%%/??}"
+            # =========== Input directory current date ===============
+            nke_wimo_input_dir_now="${nke_wimo_input_dir_tpl//%%year%%/${year_now}}"
+            nke_wimo_input_dir_now="${nke_wimo_input_dir_now//%%month%%/${month_now}}"
+            nke_wimo_input_dir_now="${nke_wimo_input_dir_now//%%day%%/${day_now}}"
+      
+            # =========================================================================
+    
+            # ===
+            dir2find_now="${nke_wimo_input_dir_now::-2}[0-3][0-9]"
+            # ===
+            dir2find="${nke_wimo_input_dir::-2}[0-3][0-9]"
+            # ===
+            dir2find_prv="${nke_wimo_input_dir_prv::-2}[0-3][0-9]"
+            # ===
+            file2find="${nke_wimo_input_file_tpl//%%buoy%%/${buoy}}"
+            file2find="${file2find//%%year%%/${year:2:2}}"
+            file2find="${file2find//%%month%%/${month}}"
+            file2find="${file2find//%%day%%/${day}}"
+            # ===
+            file2find_al="${nke_wimo_input_file_tpl//%%buoy%%/${buoy}}"
+            file2find_al="${file2find_al//%%year%%/${year_al:2:2}}"
+            file2find_al="${file2find_al//%%month%%/${month_al}}"
+            file2find_al="${file2find_al//%%day%%/${day_al}}"
+            # ===
+            file2find_al_n1="${nke_wimo_input_file_tpl//%%buoy%%/${buoy}}"
+            file2find_al_n1="${file2find_al_n1//%%year%%/${year_al_n1:2:2}}"
+            file2find_al_n1="${file2find_al_n1//%%month%%/${month_al_n1}}"
+            file2find_al_n1="${file2find_al_n1//%%day%%/${day_al_n1}}"
+    
+            files_str=`find ${dir2find}         ${dir2find_now}       \
+                            ${dir2find_prv}     -type f  -size +0c    \
+                     -name "${file2find}"       -printf "%%f:%%p\n"   \
+                  -o -name "${file2find_al}"    -printf "%%f:%%p\n"  | sort | awk -F: '!seen[$1]++ {print $2}' `
+    
+            # ===
+    
+            # $list_files contains also the file path, not only the file name
+            list_files=( $files_str )
+    
+            # this is the date and the format we want to extract
+            date_select="${year}-${month}-${day}" 
+           
+            if   [[ "${#list_files[@]}" -gt 0 && ${n_d} -eq 1 && $( stat -c '%s' ${list_files[@]} | awk '{sum += $1} END {print sum}' ) -ne 0 ]]; then
+                cat "${list_files[@]}" | egrep -m 1 -e "^[[:alpha:]\(\)]+,"                >  "${nke_wimo_send_file}" 
+                cat "${list_files[@]}" | egrep         "^${date_select} [0-9][0-9]" | sort >> "${nke_wimo_send_file}"  
+            elif [[ "${#list_files[@]}" -gt 0 && ${n_d} -ne 1 && $( stat -c '%s' ${list_files[@]} | awk '{sum += $1} END {print sum}' ) -ne 0 ]]; then
+                cat "${list_files[@]}" | egrep         "^${date_select} [0-9][0-9]" | sort >> "${nke_wimo_send_file}"  
+            else
+                echo -e "There is no data available for \"$buoy\" in $date_select date selected. The csv data file for $date_select date won't be sent via email.\n"
+                unset list_files   
+                continue
+            fi
+    
+            (( n_d+=1 ))
+          
+            unset list_files
+    
+        done # end of back-days cycle
+      
+        #========================================================================
+        #======================= Mail send file attached ========================
+        #========================================================================
+    
+        if [[ ! -s "${nke_wimo_send_file}" ]]; then
+            echo -ne "\nThere is no data available for \"$buoy\" from $(date -d "-$(( day_range_send + start_day_send - 1 ))day" +"%%Y-%%m-%%d") "
+            echo -e  "to $(date -d "-${start_day_send}day" +"%%Y-%%m-%%d")\n"
+            unset list_files
+            continue
+        fi
+    
+        sep_tmp="$( head -n 1 ${nke_wimo_send_file} | egrep -o  '[\,\;\|]' | head -n 1 )"; in_sep="${sep_tmp:=,}" ;
+        if [[ "${in_sep}" != "${out_sep}" ]]; then 
+            sed -i "s/${in_sep}/${out_sep}/g"  "${nke_wimo_send_file}"
+            echo "The separator used for the csv output file \"${nke_wimo_send_file}\" has been changed from \"${in_sep}\" to \"${out_sep}\"."
+        else
+            echo "The separator used for the csv output file \"${nke_wimo_send_file}\" is \"${in_sep}\"."
+        fi
+    
+        #============================ Compression ==============================
+    
+        if   [[ "${zip_modality}" == "on"  ]]; then
+            zip ${nke_wimo_send_file_zip}   ${nke_wimo_send_file} && echo "The zip compression operation has been correctly performed."
+            file_to_send="${nke_wimo_send_file_zip}"
+        elif [[ "${zip_modality}" == "off" ]]; then
+            echo "The zip compression won't be performed cause the 'zip_modality' is set to off."
+            file_to_send="${nke_wimo_send_file}"
+        else
+            echo "Warning: \"zip_modality\"=$zip_modality not supported. The file will be sent without compression."
+            file_to_send="${nke_wimo_send_file}"
+        fi
+    
+        #============================ Send file attached ==========================
+    
+        if [[ -s "${file_to_send}" ]]; then
+            mailx -s "Weekly ${buoy} nke_wimo buoy data file: from ${year_in}-${month_in}-${day_in} to ${year_fin}-${month_fin}-${day_fin}." -a "${file_to_send}" "${mail_data}" <<< \
+           "This is a csv file containing the weekly data for ${buoy} nke_wimo buoy. The time period goes from ${year_in}-${month_in}-${day_in} to ${year_fin}-${month_fin}-${day_fin}."             || \
+            { echo "ERROR: the email for ${buoy} nke_wimo buoy data file: from ${year_in}-${month_in}-${day_in} to ${year_fin}-${month_fin}-${day_fin} cannot be sent."; continue; }
+            echo -e "\tThe email containing the \"${file_to_send}\" data file has been correctly sent to ${mail_data} email."
+        else
+            echo "WARNING: the ${nke_wimo_send_file} file is empty. The weekly file data mail won't be sent."
+        fi
+         
+        rm -f "${nke_wimo_send_file}" "${nke_wimo_send_file_zip}" || echo "The \"${nke_wimo_send_file}\" file can't be removed."
+    
+    done     # end of buoy types cycle
+
+else    
+
+   echo -e "WARNING: The 'sd_modality': \"${sd_modality}\" value is not available. It has to be 'on' or 'off'." 
+
+fi   # end of on/off 'sd_modality' check
+
+echo -e "\n\tData send task for 'nke_wimo' buoys for last $day_range_send has been completed.\n"
+# Include tail common to all tasks, managing general calls to "ecFlow" client
+%include <tail_4_bash.h>

@@ -1,0 +1,10 @@
+2004;season1
+2004;season2
+2004;season3
+2004;season4
+2004;tot
+1004;season1
+1004;season2
+1004;season3
+1004;season4
+1004;tot

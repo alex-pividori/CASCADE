@@ -1,0 +1,98 @@
+# ******************************************************************************
+#
+#  DESCRIPTION:   this "ecFlow" suite is dedicated to the operative conversion
+#                 of data files to the BUFR binary format.
+#
+#  DEVELOPER:     Alex Pividori (alex.pividori@arpa.fvg.it)
+#                 ARPA FVG - S.O.C. Stato dell ambiente - CRMA
+#
+#  CREATION DATE: 2023-02-28.
+#
+#  MODIFICATIONS: none.
+#
+#  VERSION:       0.1.
+#
+# ******************************************************************************
+
+suite bufr_conversion
+
+    # *********************************************
+    # * ENVIRONMENTAL VARIABLES DEFINITION: START *
+    # *********************************************
+
+    # Directory used as a prefix portion of the path of the job files created
+    # by the "ecFlow" server
+    # edit ECF_HOME /lustre/arpa/operative/scratch/ecflow_suites/development
+    edit ECF_HOME /u/arpa/pividoria/ecflow
+
+    # Directory used to find the "ecFlow" files
+    #edit ECF_FILES /u/arpa/operative/src/operative_workflows/development/bufr_conversion
+    edit ECF_FILES /u/arpa/pividoria/suites/bufr_conversion
+
+    # Directory used to find the files to be included in the nodes
+    #edit ECF_INCLUDE /u/arpa/operative/src/operative_workflows/development/bufr_conversion/include
+    edit ECF_INCLUDE /u/arpa/pividoria/suites/bufr_conversion/include
+
+    # Root directory for job summary reports storage. If it is not defined, the
+    # reports will be saved in %ECF_HOME%. Summary reports are CSV (.csv) files
+    # ("%YYYY%_ecFlow_jobs-summary.csv")
+    #edit JOBS_REPORT_DIR /lustre/arpa/operative/data/monit/ecFlow/jobs_sum
+
+    # Number of times a job should be rerun if it aborts (default is 2)
+    edit ECF_TRIES 1
+
+    # Number of seconds to sleep at the end of each task (not necessary, but
+    # suggested to avoid task overlapping)
+    edit SLEEP 3
+
+    # Real clock
+    clock real
+
+    # ********************************************
+    # * ENVIRONMENTAL VARIABLES DEFINITION: STOP *
+    # ********************************************
+
+    # ******************************
+    # * FAMILIES DEFINITION: START *
+    # ******************************
+
+    # ================== conversion from CSV/mis to BUFR ======================
+
+    family buoy_bufr_conversion
+        cron 08:00
+
+        task set_dir
+
+        task launcher_buoy_converter
+            trigger set_dir eq complete 
+
+        task warnings_errors_check     
+            trigger set_dir eq complete 
+
+        task remove_all_tmp_dir
+            trigger warnings_errors_check eq complete and launcher_buoy_converter eq complete
+
+    endfamily
+
+    # ===================== Weekly email data sending  ========================
+
+    family buoy_data_send
+        cron -w 1 07:00        # every monday at 07:00 UTC
+
+        task set_dir
+
+        task send_data
+            trigger set_dir   eq complete
+
+        task remove_all_tmp_dir
+            trigger send_data eq complete
+
+    endfamily
+
+    # =========================================================================
+
+    # ******************************
+    # * FAMILIES DEFINITION: STOP *
+    # ******************************
+
+endsuite

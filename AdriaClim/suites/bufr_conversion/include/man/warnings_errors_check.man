@@ -1,0 +1,33 @@
+#==============================================================================================
+#                                    warnings_errors_check MANUAL                   
+#==============================================================================================
+
+This is the MANUAL of "warnings_errors_check" task (included in 'buoy_bufr_conversion' family).
+The implementation of this task has been suggested by a biologist collegue. Tha goal of this 
+cript consists in check and allert by mail a series of possible WARNINGS and ERRORS find inside 
+the daily nke_wimo data sent with a daily frequency. The list of warnings and/or errors managed are:
+
+- Warning:       The daily data file is not present
+- Error:         The daily data file is present but empty
+- Warning:       There are at least 3 consecutive time-steps of oxygen saturation < 20 [perc]
+- Error/Warning: There are at least 3 consecutive time-steps of Temperature < 6 [C deg]
+- Warning:       There are at least 3 consecutive time-steps of Salinity < 5 PSU
+- Error:         There are at least 3 consecutive time-steps of one or more Physical quantity equal to 0
+- Warning:       There are at least 3 consecutive time-steps of Pressure <= 0 dbar
+
+The number of consecutive values that triggers the warning/error can be changed in the initialization file.
+Also the temperature, salinity, oxygen thresholds can be modified, but the above are the default values. 
+
+If one or more of the above conditions are satisfied, a warning/error message will be sent via e-mail. The 
+mail recipient can be modified by the initialization file. The number of warnings/errors could be modified 
+in future updates.
+
+There are other options inside 'bufr_conversion.ini' initialization file that could be modified. 
+'we_modality' can activate or deactivate the entire warning/error check process. This variable can be set
+to "on" or "off".
+
+'we_buoy_names_nke_wimo' is a bash array containing the only buoys labels you wanna check for the eventual 
+warning/errors messages.  
+
+"start_day_check" "day_range_check" instead are integer values used to select the day/days we wanna take 
+into account for the checks.
